@@ -43,8 +43,7 @@ export const getBkashGrantIdToken = async () => {
 		// or -1 if the key exists with no expiry set.
 		const idTokenTtlSeconds = await redisClient.ttl(idTokenRedisKey);
 		const idTokenIsCloseToExpiry =
-			idTokenTtlSeconds >= 0 &&
-			idTokenTtlSeconds < REFRESH_BEFORE_EXPIRY_SECONDS;
+			idTokenTtlSeconds >= 0 && idTokenTtlSeconds < REFRESH_BEFORE_EXPIRY_SECONDS;
 
 		// Case 1: we already have an id token cached AND it still has
 		// plenty of time left on it. Nothing to call, just return it.
@@ -152,27 +151,22 @@ export const getBkashGrantIdToken = async () => {
 
 		// Case 3: no usable refresh token either (first run, or both
 		// expired out of Redis). Do a full grant call.
-		const result = await fetch(
-			`${config.bkash_base_url}/tokenized/checkout/token/grant`,
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Accept: "application/json",
-					username: config.bkash_username,
-					password: config.bkash_password,
-				},
-				body: JSON.stringify({
-					app_key: config.bkash_app_key,
-					app_secret: config.bkash_app_secret,
-				}),
+		const result = await fetch(`${config.bkash_base_url}/tokenized/checkout/token/grant`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Accept: "application/json",
+				username: config.bkash_username,
+				password: config.bkash_password,
 			},
-		);
+			body: JSON.stringify({
+				app_key: config.bkash_app_key,
+				app_secret: config.bkash_app_secret,
+			}),
+		});
 
 		if (!result.ok) {
-			throw new Error(
-				`Failed to get Bkash grant ID token: ${result.status} ${result.statusText}`,
-			);
+			throw new Error(`Failed to get Bkash grant ID token: ${result.status} ${result.statusText}`);
 		}
 
 		const idTokenResult = await result.json();
@@ -201,8 +195,6 @@ export const getBkashGrantIdToken = async () => {
 		// the other branches do — inconsistent return type for callers.
 		return bkashIdToken;
 	} catch (error) {
-		throw new Error(
-			"Failed to get Bkash grant ID token: " + (error as Error).message,
-		);
+		throw new Error("Failed to get Bkash grant ID token: " + (error as Error).message);
 	}
 };
