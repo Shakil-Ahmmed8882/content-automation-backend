@@ -1,0 +1,399 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
+
+	// ─────────────────────────────────────────────────────────────────────────
+	//  SEVERITY POLICY (team convention — keep this consistent across projects)
+	//
+	//    "error" → breaks the build. Real bugs, runtime crashes, security holes,
+	//              and ESM/TS correctness that silently ships broken output.
+	//    "warn"  → the default for everything else. Visible in CI + editor,
+	//              never blocks a teammate mid-task.
+	//    "info"  → nitpicks worth surfacing but not worth arguing about.
+	//    "off"   → irrelevant to a Node/Express/TypeScript backend, or so
+	//              opinionated it costs more in churn than it returns.
+	//
+	//  Rules not listed below keep their Biome-recommended defaults, which
+	//  already follow this tiering (bug-like → error, stylistic → warn/info).
+	//  Only deltas are written out, with a reason where it isn't obvious.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// Stops Biome from walking up past this folder looking for a parent config.
+	"root": true,
+
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true,
+		"defaultBranch": "main"
+	},
+
+	"files": {
+		"ignoreUnknown": true,
+		"includes": [
+			"**",
+			"!**/node_modules",
+			"!**/dist",
+			"!**/build",
+			"!**/coverage",
+			"!**/.turbo",
+			"!**/.next",
+			"!**/src/generated",
+			"!**/prisma/migrations",
+			"!**/*.min.js",
+			"!**/package-lock.json",
+			"!**/pnpm-lock.yaml",
+			"!**/yarn.lock",
+			// EJS email templates: HTML markup with embedded `<% %>` scriptlets,
+			// not JS/TS — Biome's formatter/linter can't parse them meaningfully.
+			"!**/src/app/templates/**/*.ejs"
+		]
+	},
+
+	"formatter": {
+		"enabled": true,
+		"formatWithErrors": false,
+		"indentStyle": "tab",
+		"indentWidth": 2,
+		"lineWidth": 100,
+		// Pinned to LF on purpose: mixed Windows/macOS teams otherwise get
+		// whole-file CRLF diffs on every save.
+		"lineEnding": "lf",
+		"bracketSpacing": true,
+		"expand": "auto",
+		// Left off so this file is the single source of truth — a stray
+		// .editorconfig in one repo shouldn't silently change formatting.
+		"useEditorconfig": false
+	},
+
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"jsxQuoteStyle": "double",
+			"quoteProperties": "asNeeded",
+			"semicolons": "always",
+			"trailingCommas": "all",
+			"arrowParentheses": "always",
+			"bracketSameLine": false
+		}
+	},
+
+	"json": {
+		"parser": {
+			"allowComments": true,
+			"allowTrailingCommas": false
+		},
+		"formatter": {
+			"enabled": true,
+			"trailingCommas": "none"
+		}
+	},
+
+	"linter": {
+		"enabled": true,
+
+		// Frontend framework domains are pinned off so a stray dependency can't
+		// auto-enable React/Vue/etc. rules on a backend. Flip the one you need
+		// to "recommended" when copying this into a UI project.
+		"domains": {
+			"project": "recommended",
+			"test": "recommended",
+			"next": "none",
+			"qwik": "none",
+			"react": "none",
+			"reactNative": "none",
+			"solid": "none",
+			"svelte": "none",
+			"vue": "none"
+		},
+
+		"rules": {
+			"preset": "recommended",
+
+			// ── correctness ── genuine bugs. These stay at "error" by default;
+			//    only the deltas that matter for a Node/TS service are listed.
+			"correctness": {
+				// `__dirname` / `__filename` are undefined in ESM — hard crash.
+				"noGlobalDirnameFilename": "error",
+				// Auto-fixable dead code; noisy as an error while mid-feature.
+				"noUnusedImports": "warn",
+				"noUnusedVariables": "warn",
+				"noUnusedFunctionParameters": "warn",
+				"noUnusedPrivateClassMembers": "warn",
+				"useParseIntRadix": "warn",
+				// Reaching into another module's internals across folder boundaries.
+				"noPrivateImports": "warn",
+				// Importing something that isn't in package.json — breaks in CI.
+				"noUndeclaredDependencies": "warn",
+				// Off: false-positives with path aliases and `moduleResolution: bundler`.
+				// Turn on if your project imports by relative path only.
+				"noUnresolvedImports": "off",
+				// TypeScript already reports these two.
+				"noUndeclaredVariables": "off",
+				"useImportExtensions": "off",
+				// This IS a Node app — `node:*` imports are the point.
+				"noNodejsModules": "off"
+			},
+
+			// ── suspicious ── likely mistakes.
+			"suspicious": {
+				// Kept as a warning, not an error: `any` is sometimes the honest
+				// answer while wiring up a third-party type. It should still nag.
+				"noExplicitAny": "warn",
+				// Structured logging is the goal; error/warn/info stay allowed so
+				// bootstrap and crash paths don't need suppressions.
+				"noConsole": {
+					"level": "warn",
+					"options": { "allow": ["error", "warn", "info"] }
+				},
+				"noDebugger": "error",
+				"noDoubleEquals": "error",
+				"noVar": "error",
+				// Comparisons that are always true/false — always a real bug.
+				"noConstantBinaryExpressions": "error",
+				"noAssignInExpressions": "error",
+				"noAsyncPromiseExecutor": "error",
+				"noShadowRestrictedNames": "error",
+				// `it.only` left in a file silently skips the rest of the suite in CI.
+				"noFocusedTests": "error",
+				"noSkippedTests": "warn",
+				"noEvolvingTypes": "warn",
+				"noShadow": "warn",
+				"noEmptyBlockStatements": "warn",
+				"noNestedPromises": "warn",
+				"noUnassignedVariables": "warn",
+				"noMisplacedAssertion": "warn",
+				// Duplicate/cyclic module graph — the classic cause of
+				// "undefined is not a function" at import time in a growing service.
+				"noImportCycles": "warn",
+				"noDuplicateDependencies": "warn",
+				// `async` with no `await`, and `throw new Error()` with no message.
+				"useAwait": "warn",
+				"useErrorMessage": "warn",
+				// Prefer @ts-expect-error so stale suppressions surface themselves.
+				"noTsIgnore": "warn",
+				"noParametersOnlyUsedInRecursion": "info",
+				// Off: needs full type inference, still too slow/incomplete to trust.
+				"noUnnecessaryConditions": "off",
+				// Off: requires a checked-in .env schema this pack doesn't assume.
+				"noUndeclaredEnvVars": "off",
+				// Off: ESM modules are already strict; browser-only rules.
+				"useStrictMode": "off",
+				"useGuardForIn": "off",
+				"noAlert": "off"
+			},
+
+			// ── complexity ── mostly safe auto-fixes. Warn/info, never blocking.
+			"complexity": {
+				// Legal, occasionally deliberate, never worth failing a build over.
+				"noCommaOperator": "info",
+				// The one complexity rule worth keeping: it catches the 200-line
+				// service method before it lands in review.
+				"noExcessiveCognitiveComplexity": {
+					"level": "warn",
+					"options": { "maxAllowedComplexity": 15 }
+				},
+				// 4 is Express's error handler signature (err, req, res, next).
+				"useMaxParams": {
+					"level": "warn",
+					"options": { "max": 5 }
+				},
+				"noImplicitCoercions": "warn",
+				"useOptionalChain": "warn",
+				"useArrowFunction": "warn",
+				"useDateNow": "warn",
+				"noVoid": "warn",
+				"useLiteralKeys": "info",
+				"noUselessCatchBinding": "info",
+				// Off: static-only classes are a normal service/repository shape in Node.
+				"noStaticOnlyClass": "off",
+				// Off: a hard line limit fights extraction judgement more than it helps.
+				"noExcessiveLinesPerFunction": "off",
+				// Off: `.forEach` is fine; this rule is pure preference.
+				"noForEach": "off",
+				// Off: its rewrites are often less readable than the original.
+				"useSimplifiedLogicExpression": "off",
+				"noUselessUndefined": "off"
+			},
+
+			// ── style ── where team consistency actually lives.
+			"style": {
+				// Errors here are the ones that change emitted output or crash at
+				// runtime, not taste. All four have safe autofixes.
+				"useConst": "error",
+				"useImportType": "error",
+				"useExportType": "error",
+				"useNodejsImportProtocol": "error",
+				"noCommonJs": "error",
+				// Throwing a non-Error destroys the stack trace — unusable in prod logs.
+				"useThrowOnlyError": "error",
+
+				"useThrowNewError": "warn",
+				"noParameterAssign": "warn",
+				"noNonNullAssertion": "off",
+				"noInferrableTypes": "warn",
+				"noUselessElse": "warn",
+				"noNestedTernary": "warn",
+				"noYodaExpression": "warn",
+				"useBlockStatements": "warn",
+				"useConsistentArrayType": {
+					"level": "warn",
+					"options": { "syntax": "shorthand" }
+				},
+				"useConsistentBuiltinInstantiation": "warn",
+				"useDefaultParameterLast": "warn",
+				"useEnumInitializers": "warn",
+				"useObjectSpread": "warn",
+				"useAsConstAssertion": "warn",
+				"useSingleVarDeclarator": "warn",
+				"useShorthandAssign": "warn",
+				"useTemplate": "warn",
+				// Named exports only — keeps imports greppable and refactors safe.
+				// Config files are exempted in "overrides" below.
+				"noDefaultExport": "warn",
+				// Forces env access through one typed config module instead of
+				// process.env sprinkled across the codebase. Exempted for config/.
+				"noProcessEnv": "warn",
+
+				"useCollapsedIf": "info",
+				"useForOf": "info",
+
+				// Off: too noisy against DB columns, API payloads and third-party
+				// shapes we don't control.
+				"useNamingConvention": "off",
+				// Off: `auth.controller.ts` style names don't fit the case presets.
+				"useFilenamingConvention": "off",
+				// Off: pick "interface" or "type" per team and enable it then.
+				"useConsistentTypeDefinitions": "off",
+				"useConsistentMemberAccessibility": "off",
+				"noMagicNumbers": "off",
+				"noEnum": "off",
+				"noContinue": "off",
+				"noIncrementDecrement": "off",
+				"noTernary": "off",
+				"noParameterProperties": "off",
+				"useExportsLast": "off",
+				"useNumericSeparators": "off",
+				// Off by default — fill in per project (e.g. ban "lodash" root imports).
+				"noRestrictedImports": "off"
+			},
+
+			// ── performance ── cheap wins on a request-serving process.
+			"performance": {
+				// Spreading inside a reduce is quietly O(n²).
+				"noAccumulatingSpread": "warn",
+				// Sequential awaits in a loop; usually wants Promise.all.
+				"noAwaitInLoops": "warn",
+				"noDelete": "warn",
+				"noReExportAll": "warn",
+				"useTopLevelRegex": "info",
+				// Off: barrel index.ts files are a normal module boundary on the server,
+				// where the tree-shaking cost that motivates this rule doesn't apply.
+				"noBarrelFile": "off",
+				"noNamespaceImport": "off"
+			},
+
+			// ── security ──
+			"security": {
+				"noGlobalEval": "error",
+				// Entropy-based scan for hardcoded keys/tokens. Warn, not error:
+				// it can trip on long base64-ish fixtures.
+				"noSecrets": {
+					"level": "warn",
+					"options": { "entropyThreshold": 45 }
+				},
+				// DOM/JSX-only.
+				"noBlankTarget": "off",
+				"noScriptUrl": "off",
+				"noDangerouslySetInnerHtml": "off",
+				"noDangerouslySetInnerHtmlWithChildren": "off"
+			},
+
+			// No JSX/HTML in a backend service. Turn back on for UI projects.
+			"a11y": "off"
+		}
+	},
+
+	"assist": {
+		"enabled": true,
+		"actions": {
+			// Note: assist actions only accept "on"/"off" — they cannot be
+			// demoted to a warning, and anything left "on" reports as an error.
+			// So only enable what the team is happy to have fail CI.
+			"source": {
+				// Deterministic import order kills a whole class of merge conflicts.
+				"organizeImports": "off",
+				// Off: would fail CI on a hand-edited package.json. Flip to "on"
+				// if you want its key order canonicalised too.
+				"useSortedPackageJson": "off",
+				// Off: reordering object literals changes runtime key order.
+				"useSortedKeys": "off"
+			}
+		}
+	},
+
+	"overrides": [
+		{
+			// Build/tool configs are default-export by contract and read env directly.
+			"includes": ["**/*.config.ts", "**/*.config.js", "**/*.config.mjs", "**/*.config.cjs"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noDefaultExport": "off",
+						"noProcessEnv": "off"
+					}
+				}
+			}
+		},
+		{
+			// The one module allowed to touch process.env.
+			"includes": ["**/config/**", "**/src/config.ts"],
+			"linter": {
+				"rules": {
+					"style": { "noProcessEnv": "off" }
+				}
+			}
+		},
+		{
+			// Entrypoints and one-off scripts legitimately log to stdout.
+			"includes": ["**/src/server.ts", "**/scripts/**", "**/prisma/seed.ts"],
+			"linter": {
+				"rules": {
+					"suspicious": { "noConsole": "off" }
+				}
+			}
+		},
+		{
+			// Tests trade strictness for readability.
+			"includes": ["**/*.test.ts", "**/*.spec.ts", "**/tests/**", "**/__tests__/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off",
+						"noConsole": "off"
+					},
+					"style": { "noNonNullAssertion": "off" },
+					"complexity": { "noExcessiveCognitiveComplexity": "off" }
+				}
+			}
+		},
+		{
+			// Ambient declarations frequently have to mirror `any` from upstream types.
+			"includes": ["**/*.d.ts"],
+			"linter": {
+				"rules": {
+					"suspicious": { "noExplicitAny": "off" },
+					"style": { "noDefaultExport": "off" }
+				}
+			}
+		},
+		{
+			// Appointment module — payment testing needs console output for inspection.
+			"includes": ["**/module/appointment/**"],
+			"linter": {
+				"rules": {
+					"suspicious": { "noConsole": "off" }
+				}
+			}
+		}
+	]
+}

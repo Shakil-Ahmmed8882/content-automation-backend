@@ -1,0 +1,8 @@
+<%- include("partials/header", { title: "Verify your email" }) %>
+<h1 style="margin:0 0 16px; font-size:20px; color:#111827;">Verify your email address</h1>
+<p style="margin:0 0 8px; font-size:14px; line-height:22px; color:#374151;">Hi <%= name %>,</p>
+<p style="margin:0 0 24px; font-size:14px; line-height:22px; color:#374151;">
+	Thanks for signing up for Content Automation. Use the code below to verify your email address and finish creating your account.
+</p>
+<%- include("partials/otp-box", { otp, expiresInMinutes }) %>
+<%- include("partials/footer") %>
