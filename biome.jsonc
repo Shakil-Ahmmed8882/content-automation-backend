@@ -32,6 +32,9 @@
 		"includes": [
 			"**",
 			"!**/node_modules",
+			// Tooling dir (gitignored) — holds git worktrees with their own nested
+			// Biome config, which would otherwise conflict with this root config.
+			"!**/.claude",
 			"!**/dist",
 			"!**/build",
 			"!**/coverage",

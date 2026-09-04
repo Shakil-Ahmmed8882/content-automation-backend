@@ -13,5 +13,8 @@ pnpm-workspace.yaml
 
 .vscode
 
+# Claude Code tooling (skills, worktrees) — local only, never published
+.claude
+
 # Personal — kept local, never pushed
 docs/MY-INTENT.md
