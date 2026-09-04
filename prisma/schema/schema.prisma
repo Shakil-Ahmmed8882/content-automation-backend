@@ -1,0 +1,12 @@
+// Prisma schema — Content Automation Platform
+// Multi-file schema (prisma/schema/*.prisma), mirroring the reference project.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
