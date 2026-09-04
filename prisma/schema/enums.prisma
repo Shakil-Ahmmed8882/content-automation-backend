@@ -1,0 +1,20 @@
+// Auth enums (add-credentials-auth slice).
+// Incremental schema (design D5): only the enums this slice needs are declared
+// now. Later slices add PlatformStatus, ExecutionStatus, PaymentStatus, etc.
+// Source of truth: docs/data-model.md Appendix A.
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum AuthProvider {
+  CREDENTIALS
+  GOOGLE
+}

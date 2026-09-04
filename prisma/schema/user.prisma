@@ -1,0 +1,26 @@
+// User — the person/data owner (docs/data-model.md §4.1).
+// Incremental schema (design D5): this slice declares only the `accounts`
+// relation. Later slices add socialConnections[], posts[], executions[],
+// payments[], auditLogs[] as they materialize their own tables.
+
+model User {
+  id             String     @id @default(uuid())
+  name           String
+  email          String     @unique
+  emailVerified  Boolean    @default(false)
+  avatarUrl      String?
+  avatarPublicId String?
+  role           Role       @default(USER)
+  isPremium      Boolean    @default(false)
+  premiumSince   DateTime?
+  status         UserStatus @default(ACTIVE)
+  isDeleted      Boolean    @default(false)
+  deletedAt      DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  accounts Account[]
+
+  @@index([isDeleted])
+  @@map("users")
+}

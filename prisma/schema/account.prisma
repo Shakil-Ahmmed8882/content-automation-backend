@@ -1,0 +1,21 @@
+// Account — one auth identity per login method (docs/data-model.md §4.2).
+// CREDENTIALS is the first provider (passwordHash set, providerAccountId = email).
+// Future OAuth providers (GOOGLE, …) attach as additional rows for the same
+// user, keyed by [provider, providerAccountId], with no reshape (design D3/D4).
+
+model Account {
+  id                String       @id @default(uuid())
+  userId            String
+  provider          AuthProvider
+  providerAccountId String
+  passwordHash      String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("accounts")
+}
