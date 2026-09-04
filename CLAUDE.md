@@ -49,6 +49,10 @@ Mount modules in `src/app.ts` under `/api/v1/<resource>`.
    don't fake success.
 9. **Follow `docs/data-model.md`.** Don't invent schema. UUID PKs; soft-delete only `users`+`posts`;
    images stored as `…Url` + `…PublicId` pairs; parent caches child status (execution←publications←attempts).
+10. **No AI attribution in git, ever.** Before every push, organize the diff into logical commits per
+    `.claude/skills/cmd-git-organize` (Conventional Commits, one responsibility per commit). Commit
+    messages and PR bodies must NEVER contain `Co-Authored-By`, "Generated with/by Claude/Copilot", or
+    any AI/assistant reference — this repo is public; commits must read as authored by a human.
 
 ## Auth & authorization
 
