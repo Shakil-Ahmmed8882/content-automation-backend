@@ -13,6 +13,11 @@ pnpm-workspace.yaml
 
 .vscode
 
+# Local-only Postgres cluster (see docs/decisions.md) — a separate, self-owned
+# dev DB on port 5433 so local dev/tests don't depend on the machine's
+# system-wide Postgres service credentials.
+.devdb
+
 # Claude Code tooling (skills, worktrees) — local only, never published
 .claude
 
