@@ -12,6 +12,12 @@ export default {
 	frontend_base_url: process.env.FRONTEND_BASE_URL,
 	bcrypt_salt_rounds: process.env.BCRYPT_SALT_ROUNDS,
 
+	// Dev/test only: include one-time OTPs in auth responses so E2E tests (and
+	// local testing without SMTP access) can read them without an inbox. Gated
+	// a second time at the call site by node_env !== "production" (defense in
+	// depth) — this must never be true in production regardless of the flag.
+	expose_otp_in_response: process.env.EXPOSE_OTP_IN_RESPONSE === "true",
+
 	// JWT
 	jwt_access_secret: process.env.JWT_ACCESS_SECRET!,
 	jwt_refresh_secret: process.env.JWT_REFRESH_SECRET!,

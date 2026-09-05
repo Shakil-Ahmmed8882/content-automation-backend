@@ -91,7 +91,9 @@ const forgotPassword = catchAsync(async (req: Request, res: Response) => {
 		statusCode: httpStatus.OK,
 		success: true,
 		message: result.message,
-		data: null,
+		// Dev/test-only: forwards the `otp` field when the service included one
+		// (EXPOSE_OTP_IN_RESPONSE, never in production) — see auth.service.ts.
+		data: result.otp ? { otp: result.otp } : null,
 	});
 });
 

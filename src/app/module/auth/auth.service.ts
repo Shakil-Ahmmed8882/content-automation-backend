@@ -33,6 +33,9 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const generateOtp = () => crypto.randomInt(100000, 1000000).toString();
 const INVALID_RESET_CODE = "Invalid or expired reset code";
 
+// Dev/test only (never production, regardless of the flag) — see config.expose_otp_in_response.
+const shouldExposeOtp = () => config.node_env !== "production" && config.expose_otp_in_response;
+
 /**
  * The provider seam (design D3/D4). Given a *verified* identity, either returns
  * the user that already owns it, links the new identity onto the user that owns
@@ -126,6 +129,7 @@ const register = async (payload: IRegisterPayload) => {
 	return {
 		email,
 		message: "A verification code has been sent to your email. Enter it to finish signing up.",
+		...(shouldExposeOtp() && { otp }),
 	};
 };
 
@@ -269,8 +273,9 @@ const forgotPassword = async (payload: IForgotPasswordPayload) => {
 		account?.user.status === UserStatus.ACTIVE &&
 		!account.user.isDeleted;
 
+	let otp: string | undefined;
 	if (isEligible && account) {
-		const otp = generateOtp();
+		otp = generateOtp();
 		await redisClient.set(passwordResetOtpKey(email), otp, {
 			expiration: { type: "EX", value: OTP_TTL_SECONDS },
 		});
@@ -285,6 +290,7 @@ const forgotPassword = async (payload: IForgotPasswordPayload) => {
 
 	return {
 		message: "If an account exists for that email, a password reset code has been sent.",
+		...(shouldExposeOtp() && otp && { otp }),
 	};
 };
 
