@@ -6,6 +6,8 @@ Node.js (ESM) · TypeScript · Express 5 · Prisma 7 (PostgreSQL) · Redis/BullM
 **Read these before non-trivial work (pointers, not inlined — open them):**
 - `docs/PRD.md` — product scope, features, acceptance criteria (source of truth for *what*).
 - `docs/data-model.md` — the agreed data model + Prisma schema appendix (source of truth for *schema*).
+- `docs/decisions.md` — case-study log of every dependency and non-trivial technical decision, with
+  the problem it solved and why (source of truth for *why*).
 - Patterns/architecture were adapted from a separate PH-Healthcare backend (kept **local only**,
   not part of this repo). Those patterns are fully captured in this file.
 
@@ -53,6 +55,10 @@ Mount modules in `src/app.ts` under `/api/v1/<resource>`.
     `.claude/skills/cmd-git-organize` (Conventional Commits, one responsibility per commit). Commit
     messages and PR bodies must NEVER contain `Co-Authored-By`, "Generated with/by Claude/Copilot", or
     any AI/assistant reference — this repo is public; commits must read as authored by a human.
+11. **Log every new dependency and non-trivial decision in `docs/decisions.md`, as you make it** —
+    problem it solves → what was chosen → why (+ alternatives, if any were seriously weighed).
+    Do this in the same turn as the change, not retroactively; this file is the project's case-study
+    record for later learning/review.
 
 ## Auth & authorization
 
@@ -75,9 +81,32 @@ Mount modules in `src/app.ts` under `/api/v1/<resource>`.
 - **OTP flows** (register verify, forgot-password) stash a short-lived key in Redis; the DB row is created
   only after OTP verification.
 
+## Testing
+
+- **Vitest + Supertest**, one E2E file per module: `tests/e2e/<module>.e2e.test.ts`, imports the
+  real `src/app.ts` (never `app.listen()`) and hits it in-process. Shared setup in `tests/setup.ts`
+  (connects Redis; Prisma connects lazily). Run against real Postgres + Redis — no mocks.
+- Each module's suite is written and run right after that module is applied (not during planning),
+  covering every scenario in its `openspec/changes/<change>/specs/**/spec.md`.
+- Tests create their own rows and clean up in `afterAll` via `tests/helpers/db.ts` — delete by the
+  exact emails/ids the test created, never a wildcard. Give every independent test its **own**
+  unique email — `register()` 409s on a reused one.
+- Shared fixtures/helpers live in `tests/helpers/`: `authUser.ts` (`createVerifiedUser` — a
+  logged-in test user via the real HTTP flow) and `rateLimiter.ts` (`resetAuthRateLimit` — call in
+  a top-level `beforeEach` in any suite that touches register/verify/login/forgot/reset, so the
+  shared 20-req/15min `authLimiter` bucket never leaks between tests).
+- `EXPOSE_OTP_IN_RESPONSE=true` (dev/test only, see `src/app/config`) surfaces one-time OTPs in the
+  register/forgot-password response body so tests can read them without an inbox. Gated a second
+  time on `node_env !== "production"` — must never be reachable in prod regardless of the flag.
+- `npm test` — run the full suite once; `npm run test:watch` — watch mode.
+
 ## Commands
 
 - `npm run dev` — tsx watch (needs Postgres + Redis reachable)
+- `npm run devdb:start` / `devdb:stop` — this machine's local Postgres (`.devdb/`, port 5433 — see
+  `docs/decisions.md` "Local dev environment"). Not a Windows service; start it each session.
+- `npm run devredis:start` / `devredis:stop` — this machine's local Redis (`.devdb/redis-portable/`,
+  port 6379). Also not a service — start it each session (or install Memurai instead, see decisions.md).
 - `npm run prisma:generate` — after any schema change (client → `src/generated/prisma`, gitignored)
 - `npm run prisma:migrate` — create/apply migrations
 - `npm run check:fix` — Biome lint + format (run before finishing a change)
