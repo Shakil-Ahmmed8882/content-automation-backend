@@ -1,7 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
 import httpStatus from "http-status";
 import type { JwtPayload } from "jsonwebtoken";
+import { UserStatus } from "../../generated/prisma/enums";
 import config from "../config";
+import { prisma } from "../lib/prisma";
 import { AppError } from "../utils/appError";
 import { catchAsync } from "../utils/catchAsync";
 import { jwtUtils } from "../utils/jwt";
@@ -20,10 +22,11 @@ declare global {
 }
 
 /**
- * JWT auth plumbing — verifies the access token and attaches its payload to
- * req.user. Kept model-agnostic on purpose: it does NOT read the DB or assume
- * any role set. Once the data model exists, extend it (e.g. re-check the user's
- * status/role from the database).
+ * JWT auth plumbing — verifies the access token, then re-checks the user's
+ * current DB state (not just the JWT claims) on every request: a blocked or
+ * soft-deleted user's still-valid access token is refused immediately instead
+ * of working until it naturally expires. Mirrors the same check
+ * `AuthService.refreshToken`/`login` already do.
  *
  * Usage: auth() for any logged-in user, or auth("ADMIN", "USER") to gate roles.
  */
@@ -51,16 +54,24 @@ export const auth = (...requiredRoles: string[]) => {
 			);
 		}
 
-		const { userId, email, name, role } = verifiedToken.data as JwtPayload;
+		const { userId } = verifiedToken.data as JwtPayload;
 
-		if (requiredRoles.length && !requiredRoles.includes(role)) {
+		const user = await prisma.user.findUnique({ where: { id: userId } });
+		if (!user || user.isDeleted || user.status !== UserStatus.ACTIVE) {
+			throw new AppError(
+				httpStatus.UNAUTHORIZED,
+				"Your session is no longer valid. Please log in again.",
+			);
+		}
+
+		if (requiredRoles.length && !requiredRoles.includes(user.role)) {
 			throw new AppError(
 				httpStatus.FORBIDDEN,
 				"Forbidden. You don't have permission to access this resource.",
 			);
 		}
 
-		req.user = { userId, email, name, role };
+		req.user = { userId: user.id, email: user.email, name: user.name, role: user.role };
 
 		next();
 	});
