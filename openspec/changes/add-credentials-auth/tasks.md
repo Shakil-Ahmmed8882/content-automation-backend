@@ -3,7 +3,7 @@
 - [x] 1.1 Add `Role`, `UserStatus`, `AuthProvider` enums to `prisma/schema/enums.prisma` per `docs/data-model.md`; verify `npx prisma validate` passes.
 - [x] 1.2 Add the `users` model (data-model §4.1) declaring only the `accounts` relation for now (D5 incremental schema); verify `npx prisma validate` passes.
 - [x] 1.3 Add the `accounts` model (data-model §4.2) with `@@unique([provider, providerAccountId])` and `@@unique([userId, provider])`; verify `npx prisma validate` passes.
-- [ ] 1.4 Run `prisma migrate dev --name init-auth` + `prisma generate`; verify the `users` and `accounts` tables exist and `npx tsc --noEmit` compiles against the generated client.
+- [x] 1.4 Run `prisma migrate dev --name init-auth` + `prisma generate`; verify the `users` and `accounts` tables exist and `npx tsc --noEmit` compiles against the generated client.
 
 ## 2. Shared auth building blocks
 
@@ -36,5 +36,5 @@
 
 - [x] 6.1 Mount `AuthRoutes` at `/api/v1/auth` in `src/app.ts`; verify the routes are reachable and `npx tsc --noEmit` passes.
 - [x] 6.2 Verify no secret leakage across the module: responses never contain passwordHash/tokens/stack traces and every error flows through the standard `sendResponse`/`globalErrorHandler` envelope (inspect `/me`, a failed login, and a forced error).
-- [ ] 6.3 Full end-to-end manual test of the slice (register → verify → login → `/me` → refresh → logout → forgot → reset → re-login) via Postman/HTTP; verify every step matches the spec scenarios and record the run.
+- [x] 6.3 Full end-to-end test of the slice (register → verify → login → `/me` → refresh → logout → forgot → reset → re-login) — automated instead of manual: `tests/e2e/auth.e2e.test.ts` (17 tests, Vitest + Supertest against real Postgres + Redis), covering every scenario in `specs/user-auth/spec.md` plus rate-limiting and the provider-seam invariant. Run: `npm test` → 17/17 passed (2026-09-05).
 - [x] 6.4 Run `npm run check:fix` (Biome) and `npx tsc --noEmit`; verify both pass clean before marking the slice done.
