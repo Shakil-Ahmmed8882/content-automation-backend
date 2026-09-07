@@ -1,0 +1,67 @@
+// Publishing — one "Publish Now" run fanned out to per-platform publications,
+// each with an append-only attempts ledger (docs/data-model.md §4.6–§4.8).
+// Parent caches child status: execution ← publications ← attempts. The worker
+// (add-publish-execution) writes these; reads/history live in #7, retry in #6.
+
+model Execution {
+  id          String          @id @default(uuid())
+  postId      String
+  userId      String
+  status      ExecutionStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  post         Post          @relation(fields: [postId], references: [id])
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publications Publication[]
+
+  @@index([userId])
+  @@index([postId])
+  @@map("executions")
+}
+
+model Publication {
+  id                  String            @id @default(uuid())
+  executionId         String
+  platformId          String
+  // Connection may be hard-deleted on disconnect; keep the row + the account-name
+  // snapshot so history stays readable (data-model §4.7).
+  connectionId        String?
+  platformAccountName String?
+  status              PublicationStatus @default(PENDING)
+  externalPostId      String?
+  externalPostUrl     String?
+  publishedAt         DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  execution  Execution            @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  platform   Platform             @relation(fields: [platformId], references: [id])
+  connection SocialConnection?    @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  attempts   PublicationAttempt[]
+
+  @@unique([executionId, platformId])
+  @@index([executionId])
+  @@map("publications")
+}
+
+model PublicationAttempt {
+  id              String        @id @default(uuid())
+  publicationId   String
+  attemptNumber   Int // 1 = first publish (not just retries); retryCount is derived
+  status          AttemptStatus
+  errorMessage    String?
+  externalPostId  String?
+  externalPostUrl String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime      @default(now()) // append-only, no updatedAt
+
+  publication Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@unique([publicationId, attemptNumber])
+  @@index([publicationId])
+  @@map("publication_attempts")
+}

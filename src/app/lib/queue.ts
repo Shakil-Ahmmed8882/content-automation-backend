@@ -15,6 +15,9 @@ export const PUBLISH_QUEUE = "publish";
 
 export type PublishJobData = {
 	executionId: string;
+	// Retry (add-publication-retry): the specific publications to (re)run. Absent
+	// on the initial publish, where the worker runs every publication.
+	publicationIds?: string[];
 };
 
 // Producer side: POST /posts/:id/publish enqueues a job here, returns "started",
