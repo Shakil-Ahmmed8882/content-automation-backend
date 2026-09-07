@@ -1,0 +1,23 @@
+// AuditLog — append-only audit trail for sensitive actions (docs/data-model.md
+// §4.11). No update/delete path exists anywhere in the app; `writeAuditLog`
+// (src/app/utils/audit.ts) is the only writer. `action`/`entityType` are plain
+// strings (not enums) so new event kinds never require a schema change.
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@map("audit_logs")
+}
