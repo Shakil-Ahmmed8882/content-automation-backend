@@ -1,0 +1,27 @@
+// SocialConnection — a user's connected publishing account per platform
+// (docs/data-model.md §4.4). Tokens are stored ENCRYPTED at rest (AES-256-GCM
+// via lib/crypto) and never returned to any client. Hard-deleted on disconnect
+// so the live secret is physically removed (design D5); publication history
+// survives via #5's own snapshot of platformAccountName.
+
+model SocialConnection {
+  id                  String    @id @default(uuid())
+  userId              String
+  platformId          String
+  platformAccountId   String?
+  platformAccountName String?
+  accessToken         String
+  refreshToken        String?
+  expiresAt           DateTime?
+  metadata            Json?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform     Platform      @relation(fields: [platformId], references: [id])
+  publications Publication[]
+
+  @@unique([userId, platformId])
+  @@index([userId])
+  @@map("social_connections")
+}
