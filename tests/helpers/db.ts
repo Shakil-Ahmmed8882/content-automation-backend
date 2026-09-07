@@ -9,3 +9,12 @@ export const deleteUsersByEmail = async (emails: string[]) => {
 	}
 	await prisma.user.deleteMany({ where: { email: { in: emails } } });
 };
+
+/** Deletes exactly the given platforms (by key) — never a wildcard delete,
+ * so a test run never touches the seeded `linkedin`/`facebook` rows. */
+export const deletePlatformsByKey = async (keys: string[]) => {
+	if (!keys.length) {
+		return;
+	}
+	await prisma.platform.deleteMany({ where: { key: { in: keys } } });
+};

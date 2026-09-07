@@ -1,5 +1,7 @@
 import request from "supertest";
 import app from "../../src/app";
+import { prisma } from "../../src/app/lib/prisma";
+import { Role } from "../../src/generated/prisma/enums";
 
 export const DEFAULT_TEST_PASSWORD = "correct-horse-battery-staple";
 
@@ -17,5 +19,16 @@ export const createVerifiedUser = async (email: string, password = DEFAULT_TEST_
 
 	await agent.post("/api/v1/auth/verify-email").send({ email, otp });
 
+	return agent;
+};
+
+/** A logged-in test user promoted to ADMIN directly in the DB (there's no
+ * admin-signup endpoint yet — add-admin-audit will add admin user
+ * management). `checkAuth` re-reads the role from Postgres on every request
+ * (not from the JWT), so the already-issued cookies pick up the new role
+ * immediately — no re-login needed. */
+export const createAdminUser = async (email: string, password = DEFAULT_TEST_PASSWORD) => {
+	const agent = await createVerifiedUser(email, password);
+	await prisma.user.update({ where: { email }, data: { role: Role.ADMIN } });
 	return agent;
 };
