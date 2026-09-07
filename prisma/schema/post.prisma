@@ -1,0 +1,24 @@
+// Post — a piece of content (text + one optional image) to be published
+// (docs/data-model.md §4.5). IMMUTABLE: no edit endpoint, so what appears in
+// publishing history is exactly what was published (design D1). Soft-deleted so
+// executions referencing it stay readable (design D3).
+
+model Post {
+  id            String    @id @default(uuid())
+  userId        String
+  title         String?
+  content       String
+  imageUrl      String?
+  imagePublicId String?
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions Execution[]
+
+  @@index([userId])
+  @@index([isDeleted])
+  @@map("posts")
+}
