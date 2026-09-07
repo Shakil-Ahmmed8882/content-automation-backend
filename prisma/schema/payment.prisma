@@ -1,0 +1,27 @@
+// Payment — provider-agnostic financial ledger (docs/data-model.md §4.9).
+// bKash tokenized SANDBOX (test money). On verified SUCCESS the backend sets
+// user.isPremium = true / premiumSince = now. Unique gateway refs give
+// idempotency: a replayed callback finds the already-SUCCESS row and no-ops.
+
+model Payment {
+  id                    String          @id @default(uuid())
+  userId                String
+  provider              PaymentProvider @default(BKASH)
+  purpose               PaymentPurpose  @default(PREMIUM_UPGRADE)
+  amount                Decimal         @db.Decimal(10, 2)
+  currency              String          @default("BDT")
+  status                PaymentStatus   @default(PENDING)
+  merchantInvoiceNumber String          @unique
+  providerPaymentId     String?         @unique
+  providerTransactionId String?         @unique
+  payerReference        String?
+  gatewayResponse       Json?
+  paidAt                DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("payments")
+}
