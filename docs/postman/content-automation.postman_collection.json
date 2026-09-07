@@ -1,0 +1,815 @@
+{
+	"info": {
+		"_postman_id": "c0a1e8b0-0000-4000-a000-000000000001",
+		"name": "Content Automation Platform — Manual Test Walkthrough",
+		"description": "Sequential, self-chaining walkthrough for the modules implemented so far: Auth, User Profile, Platform Catalogue (admin + public), Social Connections, Content Posts. Run folders top to bottom, request by request, inside each folder. See docs/manual-testing-guide.md for the full step-by-step instructions — this file is the companion collection to import.\n\nEverything a later request needs (OTP, user id, platform id, session cookies) is captured automatically by each request's Tests script into collection variables — you never need to copy/paste a value by hand. The only things you might edit yourself are the `test_email`/`test_password` variables (Variables tab), and only if you're re-running the whole thing from scratch.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "base_url", "value": "http://localhost:5000/api/v1", "type": "string" },
+		{ "key": "test_email", "value": "postman.tester@example.com", "type": "string" },
+		{ "key": "test_password", "value": "TestPassword123!", "type": "string" },
+		{ "key": "new_password", "value": "NewPassword456!", "type": "string" },
+		{ "key": "otp", "value": "", "type": "string" },
+		{ "key": "reset_otp", "value": "", "type": "string" },
+		{ "key": "user_id", "value": "", "type": "string" },
+		{ "key": "platform_id", "value": "", "type": "string" },
+		{ "key": "platform_key", "value": "", "type": "string" },
+		{ "key": "post_id", "value": "", "type": "string" }
+	],
+	"item": [
+		{
+			"name": "01 - Auth",
+			"description": "Registration, email verification, session, and password recovery. Run Register → Verify Email → Get Me first — that starts your session. Login / Refresh / Forgot / Reset are optional side-demos, safe to run any time after — they never end your session. Nothing here changes across re-runs except Register (see the guide's 'Re-running from scratch' section).",
+			"item": [
+				{
+					"name": "1. Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Register returns 200 (new) or 409 (already exists)', function () {",
+									"        pm.expect([200, 409]).to.include(pm.response.code);",
+									"    });",
+									"",
+									"    if (pm.response.code === 200) {",
+									"        var registerData = pm.response.json().data;",
+									"        if (registerData.otp) {",
+									"            pm.collectionVariables.set('otp', registerData.otp);",
+									"            console.log('Captured OTP:', registerData.otp);",
+									"        }",
+									"    } else {",
+									"        console.log('409: this email is already registered. If it is already VERIFIED, skip the next request (Verify Email) and run \"4. Login\" instead, then continue from \"3. Get Me\".');",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Postman Tester\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/auth/register",
+						"description": "Starts registration. Creates NO user row yet — just an OTP in Redis + (because EXPOSE_OTP_IN_RESPONSE=true in .env) the OTP in this response's `data.otp`, captured automatically into the `otp` variable for the next request.\n\nExpected: 200 the first time. 409 means `test_email` already has a verified account — see the Tests script output in the Postman Console (View > Show Postman Console) for what to do next."
+					}
+				},
+				{
+					"name": "2. Verify Email",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Email verified (201)', function () {",
+									"        pm.response.to.have.status(201);",
+									"    });",
+									"",
+									"    if (pm.response.code === 201) {",
+									"        var verifyData = pm.response.json().data;",
+									"        pm.collectionVariables.set('user_id', verifyData.id);",
+									"        console.log('Captured user_id:', verifyData.id);",
+									"        console.log('Session cookies (accessToken/refreshToken) are now set — Postman will resend them automatically on every request below.');",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{test_email}}\",\n  \"otp\": \"{{otp}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/auth/verify-email",
+						"description": "Completes registration using the `otp` captured by the previous request, creates the user, and logs you in (sets httpOnly `accessToken`/`refreshToken` cookies — Postman's cookie jar stores and resends these automatically on every request that follows, no manual header needed).\n\nExpected: 201, with the created user in `data` (no password ever included). If this 400s with 'expired', the OTP is more than 5 minutes old — re-run '1. Register' to get a fresh one."
+					}
+				},
+				{
+					"name": "3. Get Me",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/auth/me",
+						"description": "Confirms the session from step 2 works. Expected: 200 with your user profile. If you get 401 here, the cookies weren't sent — check Postman's cookie jar (bottom of the response panel > Cookies) has entries for localhost."
+					}
+				},
+				{
+					"name": "4. (Optional) Login",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/auth/login",
+						"description": "Only needed if you skipped Verify Email because your test_email was already verified (see Register's 409 note), or if you want to re-prove login works. Safe to run any time — just re-issues the same session cookies. Expected: 200."
+					}
+				},
+				{
+					"name": "5. (Optional) Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": "{{base_url}}/auth/refresh-token",
+						"description": "Rotates the session using the httpOnly refreshToken cookie (sent automatically). Safe to run any time. Expected: 200."
+					}
+				},
+				{
+					"name": "6. (Optional) Forgot Password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('200', function () { pm.response.to.have.status(200); });",
+									"    var forgotData = pm.response.json().data;",
+									"    if (forgotData && forgotData.otp) {",
+									"        pm.collectionVariables.set('reset_otp', forgotData.otp);",
+									"        console.log('Captured reset_otp:', forgotData.otp);",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{test_email}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/auth/forgot-password",
+						"description": "Generates a password-reset code (captured into `reset_otp`). Always returns the same generic message whether or not the email exists (no account enumeration) — that's expected, not a bug. Does NOT touch your current session; safe to run any time."
+					}
+				},
+				{
+					"name": "7. (Optional) Reset Password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('200', function () { pm.response.to.have.status(200); });",
+									"    if (pm.response.code === 200) {",
+									"        pm.collectionVariables.set('test_password', pm.collectionVariables.get('new_password'));",
+									"        console.log('test_password variable updated to match the new password.');",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{test_email}}\",\n  \"otp\": \"{{reset_otp}}\",\n  \"newPassword\": \"{{new_password}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/auth/reset-password",
+						"description": "Uses the `reset_otp` from the previous request to set a new password. Run '6. (Optional) Forgot Password' immediately before this one (the code expires in 5 minutes). Does NOT end your current session (cookies untouched) — safe mid-flow. After this runs, the `test_password` variable is auto-updated so every later request that logs in again keeps working."
+					}
+				}
+			]
+		},
+		{
+			"name": "02 - User Profile",
+			"description": "Requires an active session — run 01 - Auth (Register → Verify Email → Get Me) first.",
+			"item": [
+				{
+					"name": "1. Get My Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/users/me",
+						"description": "Expected: 200. Includes `isPremium`, `providers` (e.g. [\"CREDENTIALS\"]), never a password/token."
+					}
+				},
+				{
+					"name": "2. Update My Profile",
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Postman Tester (Updated)\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/users/me",
+						"description": "Expected: 200, `data.name` reflects the change. Only `name` is editable here — an `email` field in the body is silently ignored by design."
+					}
+				},
+				{
+					"name": "3. (Optional, needs Cloudinary) Upload Avatar",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [{ "key": "avatar", "type": "file", "src": [] }]
+						},
+						"url": "{{base_url}}/users/me/avatar",
+						"description": "⚠️ Click the 'avatar' row's 'Select Files' button and pick any small PNG/JPG from your computer — Postman can't auto-attach a file from a collection for security reasons.\n\nThis repo's .env has EMPTY CLOUDINARY_* values (no real account configured). Without real credentials this request WILL fail (a 500 from Cloudinary rejecting the fake key) — that's expected, not a bug (see docs/decisions.md). Skip this request unless you've put real Cloudinary credentials in .env and restarted the server."
+					}
+				},
+				{
+					"name": "4. Remove Avatar",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/users/me/avatar",
+						"description": "Expected: 200, `data.avatarUrl`/`avatarPublicId` are null. Safe to run even if you skipped the upload above (nothing to delete, just confirms the fields are already clear)."
+					}
+				},
+				{
+					"name": "5. Change Password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('200', function () { pm.response.to.have.status(200); });",
+									"    if (pm.response.code === 200) {",
+									"        pm.collectionVariables.set('test_password', pm.collectionVariables.get('new_password'));",
+									"        console.log('test_password variable updated to match the new password.');",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"currentPassword\": \"{{test_password}}\",\n  \"newPassword\": \"{{new_password}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/users/me/password",
+						"description": "Expected: 200. `currentPassword` always uses whatever `test_password` currently holds (kept in sync automatically), so this works whether or not you ran '7. (Optional) Reset Password' earlier."
+					}
+				}
+			]
+		},
+		{
+			"name": "03 - Platform Catalogue (Admin)",
+			"description": "⚠️ SETUP REQUIRED FIRST — these routes need an ADMIN. There's no admin-signup API yet, so promote your test user directly:\n\n1. Make sure the app's Postgres + Redis are running and `npm run dev` is up.\n2. In a terminal, from the content-automation-backend folder, run:\n   npm run admin:promote -- <the value currently in your test_email variable>\n   (default is: npm run admin:promote -- postman.tester@example.com)\n3. You should see 'Promoted <email> to ADMIN.' — checkAuth re-reads the role from Postgres on every request, so your EXISTING session cookies (from 01 - Auth) immediately count as admin. No re-login needed.\n\nRun 01 - Auth and the promote command before anything in this folder.",
+			"item": [
+				{
+					"name": "1. Create Platform",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Created (201)', function () { pm.response.to.have.status(201); });",
+									"    if (pm.response.code === 201) {",
+									"        var createData = pm.response.json().data;",
+									"        pm.collectionVariables.set('platform_id', createData.id);",
+									"        pm.collectionVariables.set('platform_key', createData.key);",
+									"        console.log('Captured platform_id:', createData.id);",
+									"    } else if (pm.response.code === 403) {",
+									"        console.log('403 = your test_email is not ADMIN yet. Run the npm run admin:promote command in this folder\\'s description first.');",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"key\": \"postman-platform-{{$timestamp}}\",\n  \"name\": \"Postman Test Platform\",\n  \"status\": \"LIVE\",\n  \"sortOrder\": 99,\n  \"isActive\": true\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/admin/platforms",
+						"description": "`key` uses Postman's built-in `{{$timestamp}}` dynamic variable so it's always unique — you can re-run this request as many times as you like without ever hitting a duplicate-key 409, unlike Register.\n\nExpected: 201. If you get 403, your test user isn't ADMIN yet — see this folder's description."
+					}
+				},
+				{
+					"name": "2. List All Platforms",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/admin/platforms",
+						"description": "Expected: 200, an array including the platform you just created AND the two seeded rows (`linkedin`, `facebook`) — this endpoint returns inactive rows too, unlike the public list."
+					}
+				},
+				{
+					"name": "3. Get Platform By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/admin/platforms/{{platform_id}}",
+						"description": "Expected: 200, the same platform created in step 1 (matches `platform_key`)."
+					}
+				},
+				{
+					"name": "4. Update Platform",
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Postman Test Platform (Updated)\",\n  \"sortOrder\": 50\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/admin/platforms/{{platform_id}}",
+						"description": "Expected: 200, `data.name`/`data.sortOrder` reflect the change. `key` is deliberately not editable here (immutable by design)."
+					}
+				},
+				{
+					"name": "5. (Optional, needs Cloudinary) Set Platform Logo",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [{ "key": "logo", "type": "file", "src": [] }]
+						},
+						"url": "{{base_url}}/admin/platforms/{{platform_id}}/logo",
+						"description": "⚠️ Click the 'logo' row's 'Select Files' button and pick any small PNG/JPG. Same Cloudinary caveat as the avatar upload in 02 - User Profile: this repo's .env has empty CLOUDINARY_* values, so without real credentials this request WILL fail (expected, not a bug). Skip unless you've configured real Cloudinary credentials."
+					}
+				},
+				{
+					"name": "6. Retire Platform",
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"isActive\": false\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{base_url}}/admin/platforms/{{platform_id}}",
+						"description": "Expected: 200, `data.isActive` is now false. The record is NOT deleted (run '2. List All Platforms' again to confirm it's still there) — only hidden from the public active list, which is exactly what the next folder proves."
+					}
+				}
+			]
+		},
+		{
+			"name": "04 - Platform Catalogue (Public)",
+			"description": "Requires only a logged-in session (any role) — run 01 - Auth first. Best run AFTER '03 - Platform Catalogue (Admin)' so you can see your retired test platform correctly excluded.",
+			"item": [
+				{
+					"name": "1. List Active Platforms",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/platforms",
+						"description": "Expected: 200, an array of ONLY active platforms ordered by sortOrder — includes the seeded `linkedin`/`facebook`, but NOT the platform you retired in the previous folder (and not any platform you created with `isActive: false`, if you tried that in step 1's List-All)."
+					}
+				}
+			]
+		},
+		{
+			"name": "05 - Social Connections",
+			"description": "Requires an active session — run 01 - Auth first.\n\n⚠️ IMPORTANT — what's testable without real OAuth apps: this repo's .env has EMPTY LinkedIn/Facebook credentials, and completing a real connection requires interactive OAuth consent in a browser against a real provider app (which can't be scripted). So the full connect→publish flow is NOT exercisable here. What you CAN verify manually below: the endpoints exist, are session-guarded, gate on LIVE platforms, issue an OAuth URL + anti-forgery state, reject a forged callback, and enforce ownership on disconnect. The token encryption / storage / Page-selection behavior is fully covered by the automated suite (tests/e2e/social-connections.e2e.test.ts).",
+			"item": [
+				{
+					"name": "1. List My Connections",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/connections",
+						"description": "Expected: 200 with an array (empty on a fresh account — you haven't connected anything). Tokens are NEVER included in this response by design."
+					}
+				},
+				{
+					"name": "2. Start LinkedIn Connect (LIVE platform)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/connections/linkedin/connect",
+						"description": "Expected: 200 with `data.authUrl` — the LinkedIn OAuth URL (contains a `state=` anti-forgery token this server just issued into Redis). `linkedin` is a LIVE seeded platform, so connect is allowed.\n\nTo ACTUALLY connect you would open that authUrl in a browser and consent — but that needs real LINKEDIN_CLIENT_ID/SECRET in .env (they're empty here), so the URL will error at LinkedIn. This step only proves the connect endpoint issues a valid URL + state."
+					}
+				},
+				{
+					"name": "3. Start Connect on a non-LIVE platform (refused)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/connections/some-unknown-platform/connect",
+						"description": "Expected: 404 (no such platform). To see the 'not LIVE' 400 path instead, first create a COMING_SOON platform via 03 - Platform Catalogue (Admin) ▸ Create Platform with `\"status\": \"COMING_SOON\"`, then call `/connections/<that key>/connect` — it returns 400 because only LIVE platforms are connectable."
+					}
+				},
+				{
+					"name": "4. Forged Callback is rejected (CSRF)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/connections/linkedin/callback?code=fake-code&state=bogus-state",
+						"description": "Expected: 400 — the OAuth callback validates the single-use `state` against Redis and refuses a value it never issued, storing nothing. This is the CSRF defense; a real provider redirect carries a state this server minted in step 2."
+					}
+				},
+				{
+					"name": "5. Disconnect (not connected → 404)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/connections/linkedin",
+						"description": "Expected: 404 — you have no LinkedIn connection to remove (you never completed a real OAuth connect). Once a real connection exists, this hard-deletes it (physically removing the encrypted tokens) and returns 200."
+					}
+				}
+			]
+		},
+		{
+			"name": "06 - Content Posts",
+			"description": "Requires an active session — run 01 - Auth (Register → Verify Email → Get Me) first. This is the content CRUD you asked to verify (OpenSpec change: add-content-posts): create a post (text + one optional image), list with pagination + search, get one, soft-delete, and confirm posts are immutable.\n\nRun 1 → 10 in order. Everything a later request needs (the created post id) is captured automatically into the `post_id` variable — no copy/paste.\n\n⚠️ What's fully checkable by hand here: create (text-only), list + meta, search, get-by-id, empty-content rejection, no-edit-endpoint (immutability), soft-delete, and gone-after-delete. The live IMAGE upload (request 3) needs real CLOUDINARY_* creds — this repo's .env has them empty (same as avatar/logo), so that one request is OPTIONAL and will 500 without them; that's expected, not a bug. Cross-user isolation (one user can't read or delete another's posts) can't be shown with a single session — it's proven by the automated suite (tests/e2e/content-posts.e2e.test.ts).",
+			"item": [
+				{
+					"name": "1. Create Post (text only)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Post created (201)', function () { pm.response.to.have.status(201); });",
+									"    if (pm.response.code === 201) {",
+									"        var post = pm.response.json().data;",
+									"        pm.collectionVariables.set('post_id', post.id);",
+									"        console.log('Captured post_id:', post.id);",
+									"        pm.test('No image on a text-only post', function () {",
+									"            pm.expect(post.imageUrl).to.be.null;",
+									"            pm.expect(post.imagePublicId).to.be.null;",
+									"        });",
+									"        pm.test('Not soft-deleted on creation', function () {",
+									"            pm.expect(post.isDeleted).to.eql(false);",
+									"        });",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"My First Post\",\n  \"content\": \"Hello from Postman — post #{{$timestamp}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/posts",
+						"description": "Creates a text post with no image. The body here is JSON — the endpoint accepts either JSON or multipart/form-data; you only need multipart when you're actually attaching an image (request 3).\n\nExpected: 201. `data.imageUrl`/`data.imagePublicId` are null, `data.isDeleted` is false, and `data.userId` is you. The Tests script saves `data.id` into the `post_id` variable for every request below."
+					}
+				},
+				{
+					"name": "2. Create Another Post (feeds list + search)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Second post created (201)', function () { pm.response.to.have.status(201); });",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"content\": \"unicorns are magical — {{$timestamp}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/posts",
+						"description": "A second post whose content contains the word 'unicorns', so request 5 (Search) has a deterministic hit and request 4 (List) shows a total of at least 2. Expected: 201."
+					}
+				},
+				{
+					"name": "3. (Optional, needs Cloudinary) Create Post With Image",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    // Three valid outcomes, so this folder stays green however you run it:",
+									"    //   201 + imageUrl set   -> a file was attached AND real CLOUDINARY_* creds exist.",
+									"    //   201 + imageUrl null  -> no file attached (the collection default / Newman) -> created as a text post.",
+									"    //   500                  -> a file WAS attached but CLOUDINARY_* is empty in .env (expected here).",
+									"    pm.test('201 (created) or 500 (image upload without Cloudinary creds — expected)', function () {",
+									"        pm.expect([201, 500]).to.include(pm.response.code);",
+									"    });",
+									"    if (pm.response.code === 201) {",
+									"        var post = pm.response.json().data;",
+									"        if (post.imageUrl) {",
+									"            console.log('Image stored on the post:', post.imageUrl);",
+									"        } else {",
+									"            console.log('No file was attached — created as a text post. To exercise the image path, attach a PNG/JPG in Body > form-data (image row > Select Files) and set real CLOUDINARY_* creds in .env.');",
+									"        }",
+									"    } else {",
+									"        console.log('500 = a file was attached but CLOUDINARY_* is empty in .env (expected). Put real creds in .env + restart npm run dev to store an image.');",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "content",
+									"value": "Post with an image",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": "{{base_url}}/posts",
+						"description": "⚠️ Click the 'image' row's 'Select Files' button and pick any small PNG/JPG — Postman can't auto-attach a file from an imported collection.\n\nThis repo's .env has EMPTY CLOUDINARY_* values, so without real credentials this request WILL fail with a 500 (Cloudinary rejecting the fake key) — expected, not a bug, same caveat as the avatar/logo uploads. Skip it unless you've configured real Cloudinary credentials and restarted the server. The 'without image' path (requests 1–2) fully proves post creation regardless."
+					}
+				},
+				{
+					"name": "4. List My Posts (pagination + meta)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('200', function () { pm.response.to.have.status(200); });",
+									"    var body = pm.response.json();",
+									"    pm.test('Returns an array of posts', function () {",
+									"        pm.expect(body.data).to.be.an('array');",
+									"    });",
+									"    pm.test('Pagination meta is present', function () {",
+									"        pm.expect(body.meta).to.have.property('page');",
+									"        pm.expect(body.meta).to.have.property('limit');",
+									"        pm.expect(body.meta).to.have.property('total');",
+									"        pm.expect(body.meta).to.have.property('totalPages');",
+									"    });",
+									"    console.log('Total posts for this user:', body.meta && body.meta.total);",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/posts?page=1&limit=10",
+						"description": "Owner-scoped list of your non-deleted posts. Expected: 200 with `data` (an array) and `meta` = { page, limit, total, totalPages }. After requests 1–2 the total is at least 2. Only YOUR posts appear — never another user's (that isolation is asserted by the automated suite).\n\nTweak `page`/`limit` and add `&sort=title` or `&sort=-createdAt` to see sorting; `-` prefix = descending."
+					}
+				},
+				{
+					"name": "5. Search My Posts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('200', function () { pm.response.to.have.status(200); });",
+									"    var body = pm.response.json();",
+									"    pm.test('Finds the unicorn post from request 2', function () {",
+									"        pm.expect(body.data.length).to.be.above(0);",
+									"        pm.expect((body.data[0].content || '').toLowerCase()).to.include('unicorn');",
+									"    });",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/posts?search=unicorn",
+						"description": "Case-insensitive search over content + title. Expected: 200, and at least the post you created in request 2 ('unicorns are magical …') comes back. Search is combined with the same pagination/meta as request 4."
+					}
+				},
+				{
+					"name": "6. Get Post By Id",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('200', function () { pm.response.to.have.status(200); });",
+									"    pm.test('Returns the post captured in request 1', function () {",
+									"        pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('post_id'));",
+									"    });",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/posts/{{post_id}}",
+						"description": "Fetch the single post you created in request 1 (via the captured `post_id`). Expected: 200, `data.id` equals `post_id`. A post id you don't own returns 404 and reveals nothing — that owner-scoping is covered by the automated suite."
+					}
+				},
+				{
+					"name": "7. Validation — Empty / Whitespace Content Rejected",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Rejected (400)', function () { pm.response.to.have.status(400); });",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"content\": \"   \"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/posts",
+						"description": "Proves the non-empty-content rule. Whitespace-only content is trimmed to empty and rejected before anything is stored. Expected: 400, and no post is created."
+					}
+				},
+				{
+					"name": "8. Immutability — No Edit Endpoint (PATCH → 404)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('No edit route exists (404)', function () { pm.response.to.have.status(404); });",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"content\": \"trying to change it\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/posts/{{post_id}}",
+						"description": "Posts are immutable by design (spec: 'Posts are immutable after creation') so publishing history stays faithful — there is deliberately NO PATCH or PUT route on a post. Expected: 404 (route not found). Try the same URL with PUT if you like — same 404."
+					}
+				},
+				{
+					"name": "9. Delete Post (soft delete)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Deleted (200)', function () { pm.response.to.have.status(200); });",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/posts/{{post_id}}",
+						"description": "Soft-deletes the post from request 1: it's marked deleted and removed from your list, but the row is retained so publishing history that references it stays readable. Expected: 200. You can only delete your own post — deleting someone else's returns 404 (automated suite)."
+					}
+				},
+				{
+					"name": "10. Confirm Soft-Delete — Now 404 & Gone From List",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Deleted post no longer retrievable (404)', function () { pm.response.to.have.status(404); });",
+									"    console.log('Re-run request 4 (List) — the total dropped by one; the row still exists in the DB (soft delete), just hidden.');",
+									"})();"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/posts/{{post_id}}",
+						"description": "The post you just soft-deleted is no longer retrievable. Expected: 404. Re-run request 4 (List My Posts) and you'll see the total dropped by one and this post gone from the array — while the underlying row is retained in Postgres (soft delete). That retention is asserted directly by the automated suite."
+					}
+				}
+			]
+		},
+		{
+			"name": "07 - Cleanup (optional — run at most ONE of these, LAST)",
+			"description": "⚠️ These are two ALTERNATIVE endings, not a sequence — run at most one, only once you're completely done testing everything above:\n\n• '1. Delete My Account' — ends the session AND soft-deletes the user (it clears cookies itself as a side effect, so it must come first in this folder's order if you ever run both).\n• '2. Logout' — ends the session only, keeps the user for later. Running this FIRST would make Delete My Account 401 (no session left) — that's why Logout is listed second here, as a fallback if you decide not to delete.\n\nMost of the time you'll run neither and just leave your test data in place for next time.",
+			"item": [
+				{
+					"name": "1. Delete My Account",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/users/me",
+						"description": "Soft-deletes your test user and clears the session cookies as a side effect (no separate Logout needed after this). Expected: 200. After this, `test_email` can never `Register` fresh again (the row still exists, just soft-deleted) — pick a new `test_email` (Variables tab) if you want to run this whole collection again from scratch."
+					}
+				},
+				{
+					"name": "2. Logout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": "{{base_url}}/auth/logout",
+						"description": "Only run this if you did NOT run '1. Delete My Account' (that request already clears cookies). Clears your session cookies, keeps the user/account intact for a future run. Expected: 200. Re-run '4. (Optional) Login' under 01 - Auth if you want to keep testing afterward."
+					}
+				}
+			]
+		}
+	]
+}
