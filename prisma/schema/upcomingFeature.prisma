@@ -1,0 +1,20 @@
+// UpcomingFeature — admin-managed catalogue of planned premium features
+// (docs/data-model.md §4.10). Global catalogue: no User relation. Hard-deleted
+// (no downstream FKs reference it), unlike Platform/Post/User.
+
+model UpcomingFeature {
+  id               String                @id @default(uuid())
+  slug             String                @unique
+  title            String
+  shortDescription String
+  description      String
+  imageUrl         String?
+  imagePublicId    String?
+  status           UpcomingFeatureStatus @default(COMING_SOON)
+  sortOrder        Int                   @default(0)
+  isPremiumVisible Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@map("upcoming_features")
+}
