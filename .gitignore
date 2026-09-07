@@ -6,6 +6,10 @@ dist
 
 /src/generated
 
+# Redis local dump / append-only files (runtime artifacts)
+dump.rdb
+*.rdb
+
 # Lock Files — npm's package-lock.json IS committed for reproducible installs
 pnpm-lock.yaml
 yarn.lock
