@@ -52,6 +52,11 @@ export default {
 	cloudinary_api_key: process.env.CLOUDINARY_API_KEY,
 	cloudinary_api_secret: process.env.CLOUDINARY_API_SECRET,
 
+	// Token encryption (social-connections): AES-256-GCM key material for
+	// encrypting OAuth tokens at rest. lib/crypto derives a 32-byte key from
+	// this via SHA-256, so any non-empty string works; use a long random one.
+	token_encryption_key: process.env.TOKEN_ENCRYPTION_KEY,
+
 	// LinkedIn OAuth + publishing
 	linkedin_client_id: process.env.LINKEDIN_CLIENT_ID,
 	linkedin_client_secret: process.env.LINKEDIN_CLIENT_SECRET,
