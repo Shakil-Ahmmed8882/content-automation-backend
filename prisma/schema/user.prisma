@@ -1,7 +1,10 @@
 // User — the person/data owner (docs/data-model.md §4.1).
-// Incremental schema (design D5): this slice declares only the `accounts`
-// relation. Later slices add socialConnections[], posts[], executions[],
-// payments[], auditLogs[] as they materialize their own tables.
+// Incremental schema (design D5): this slice declares `accounts`,
+// `socialConnections` + `posts`. Later slices add executions[], payments[],
+// auditLogs[] as they materialize their own tables.
+//
+// `auditLogs[]` (add-admin-audit) — the actions this user performed as an
+// actor (audit_logs.actorId), not actions performed on them.
 
 model User {
   id             String     @id @default(uuid())
@@ -19,7 +22,12 @@ model User {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  accounts Account[]
+  accounts          Account[]
+  socialConnections SocialConnection[]
+  posts             Post[]
+  executions        Execution[]
+  payments          Payment[]
+  auditLogs         AuditLog[]
 
   @@index([isDeleted])
   @@map("users")

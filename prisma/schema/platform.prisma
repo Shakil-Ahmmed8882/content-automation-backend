@@ -1,0 +1,21 @@
+// Platform — admin-managed publishing targets (docs/data-model.md §4.3).
+// Never hard-deleted (retire via isActive=false) so social_connections/
+// publications keep valid FKs forever (design D3).
+
+model Platform {
+  id            String         @id @default(uuid())
+  key           String         @unique
+  name          String
+  logoUrl       String?
+  logoPublicId  String?
+  status        PlatformStatus @default(COMING_SOON)
+  isActive      Boolean        @default(true)
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  connections  SocialConnection[]
+  publications Publication[]
+
+  @@map("platforms")
+}

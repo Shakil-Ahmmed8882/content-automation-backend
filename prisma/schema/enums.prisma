@@ -18,3 +18,56 @@ enum AuthProvider {
   CREDENTIALS
   GOOGLE
 }
+
+// add-platform-catalogue slice.
+enum PlatformStatus {
+  LIVE
+  COMING_SOON
+}
+
+// add-publish-execution slice (data-model §4.6–§4.8).
+// Parent caches child status: execution ← publications ← attempts.
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  PARTIALLY_COMPLETED
+  FAILED
+}
+
+enum PublicationStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum AttemptStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+// add-premium-payment slice (data-model §4.9). Provider-agnostic ledger: add
+// STRIPE/SSLCOMMERZ as new enum values later, no reshape.
+enum PaymentProvider {
+  BKASH
+}
+
+enum PaymentPurpose {
+  PREMIUM_UPGRADE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+// add-upcoming-features slice (data-model §4.10).
+enum UpcomingFeatureStatus {
+  COMING_SOON
+  IN_DEVELOPMENT
+  PLANNED
+}
