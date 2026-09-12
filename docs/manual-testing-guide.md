@@ -9,28 +9,48 @@ order, and you'll never hit a step that needs something you haven't got yet.
 
 ## Modules done so far (implemented + automated-tested from my end)
 
-Of the 12 planned OpenSpec changes (`openspec/changes/`), these 5 are fully implemented with a
-passing Vitest+Supertest E2E suite (`npm test` → 78 passed, 4 skipped pending real Cloudinary
-credentials, 0 failed):
+**All 12 planned OpenSpec changes (`openspec/changes/`) are implemented** and each has a passing
+Vitest+Supertest E2E suite (`npm test` → 134 passing across 12 suites, 0 failing — see
+`docs/e2e-verification-progress.md`). This collection now covers **every one of them** (folders
+01–13):
 
-| # | Module (OpenSpec change) | Covers |
-|---|---|---|
-| 1 | `add-credentials-auth` | register → verify email (OTP) → login → session (`/me`, refresh) → logout → forgot/reset password |
-| 2 | `add-user-profile` | get/update profile, avatar upload/replace/remove, change password, soft-delete account |
-| 3 | `add-platform-catalogue` | admin CRUD + logo for the platform catalogue, public active-platforms list |
-| 4 | `add-social-connections` | connect/callback (LinkedIn + Facebook OAuth), encrypted token storage, Facebook Page selection, list/disconnect connections |
-| 5 | `add-content-posts` | create post (text + optional image), owner-scoped list (pagination/sort/search), get-by-id, soft-delete, immutability (no edit endpoint) |
+| # | Module (OpenSpec change) | Postman folder | Covers |
+|---|---|---|---|
+| 1 | `add-credentials-auth` | 01 | register → verify email (OTP) → login → session (`/me`, refresh) → logout → forgot/reset password |
+| 2 | `add-user-profile` | 02 | get/update profile, avatar upload/replace/remove, change password, soft-delete account |
+| 3 | `add-platform-catalogue` | 03, 04 | admin CRUD + logo for the platform catalogue, public active-platforms list |
+| 4 | `add-social-connections` | 05 | connect/callback (LinkedIn + Facebook OAuth), encrypted token storage, Facebook Page selection, list/disconnect |
+| 5 | `add-content-posts` | 06 | create post (text + optional image), owner-scoped list (pagination/sort/search), get-by-id, soft-delete |
+| 6 | `add-publish-execution` | 07 | trigger a background publish, list execution history, per-platform execution detail |
+| 7 | `add-publication-retry` | 08 | retry one failed publication, retry a whole failed execution |
+| 8 | `add-execution-history` | 07 | owner-scoped executions list + detail (same reads as folder 07) |
+| 9 | `add-premium-payment` | 09 | bKash sandbox: create payment → gateway URL → verify → premium flip |
+| 10 | `add-payment-history` | 10 | owner-scoped payment history list + status by id |
+| 11 | `add-upcoming-features` | 11, 12 | admin CRUD + image for the premium catalogue; premium-user list/detail |
+| 12 | `add-admin-audit` | 13 | admin user list/get, block/unblock, role change, grant premium, append-only audit log |
 
-The remaining 7 (`add-publish-execution`, `add-publication-retry`, `add-execution-history`,
-`add-premium-payment`, `add-payment-history`, `add-upcoming-features`, `add-admin-audit`) aren't
-built yet — this collection covers exactly the 5 above, nothing more.
+> **What "verified" does and doesn't mean for the network-dependent bits.** The automated suite and
+> the manually-checkable surface cover the whole platform, but three flows touch outside services
+> that a Postman click alone can't fully drive:
+> - **Real social posting (folder 07)** — publishing enqueues a background job that calls the real
+>   LinkedIn/Facebook API. That only succeeds if you completed a real OAuth connect (folder 05) with
+>   real app credentials. Without a live connection the publish is refused (400); with a *seeded but
+>   fake* connection the execution runs and then moves to **FAILED** — which is still a valid thing
+>   to observe (the execution/publication/attempt rows and statuses all update correctly).
+> - **bKash payment (folder 09)** — needs real `BKASH_*` sandbox credentials in `.env` to get a
+>   gateway URL. Backend is authoritative: premium only flips after the gateway confirms success.
+> - **Cloudinary image uploads** (avatar, platform logo, post image, feature image) — real Cloudinary
+>   credentials are configured (see `docs/credentials-setup-log.md`); these requests are marked
+>   *(Optional — attach a file)* since attaching one is a manual click Postman can't script.
 
-> **Note on `add-social-connections` and manual testing:** the connection *storage/encryption/
-> Page-selection* logic is fully covered by the automated suite, but a real end-to-end OAuth
-> *connect* needs interactive browser consent against a real LinkedIn/Facebook app (this repo's
-> `.env` has empty credentials). So the Postman folder for it (`05 - Social Connections`) verifies
-> only the manually-checkable surface — endpoints exist, are session-guarded, gate on LIVE
-> platforms, issue a state, reject a forged callback, enforce ownership — not a live connection.
+> **Note on `add-social-connections` and manual testing:** real LinkedIn OAuth credentials are
+> configured (see `docs/credentials-setup-log.md`) and verified end-to-end — opening the authUrl
+> from folder `05` request 2 in a real browser and clicking Allow genuinely connects your account.
+> Facebook credentials are configured too, but the app's Page permissions (`pages_manage_posts`,
+> `pages_read_engagement`) are still being finished on Facebook's side, so its consent screen
+> currently errors until that's resolved. Either way, the connection *storage/encryption/
+> Page-selection* logic is also fully covered by the automated suite
+> (`tests/e2e/social-connections.e2e.test.ts`).
 
 ## 0. Before you start
 
@@ -44,8 +64,9 @@ built yet — this collection covers exactly the 5 above, nothing more.
    (Public)` below.
 3. **Confirm `.env` has `EXPOSE_OTP_IN_RESPONSE=true`** (it already does in this repo). This is
    what lets the Register/Forgot-Password responses hand back the OTP directly instead of you
-   having to read a real inbox — SMTP in `.env` is a placeholder (`your-email@gmail.com`), so no
-   real email is actually sent; the app logs the send failure and moves on (by design).
+   having to read a real inbox. Real Gmail SMTP credentials are configured now too, so real emails
+   do go out (subject to Gmail's own daily send quota) — but you never need to check an inbox to
+   proceed through this guide either way, since the OTP is always in the response.
 4. **Import the collection:** Postman → **Import** → select
    `docs/postman/content-automation.postman_collection.json`.
 5. **Check the variables:** open the collection → **Variables** tab. Defaults are already filled
@@ -58,7 +79,42 @@ built yet — this collection covers exactly the 5 above, nothing more.
    collection. If something 401s unexpectedly, check **Cookies** at the bottom of the response
    panel to see what's actually stored.
 
-Run the folders in this exact order: **01 → 02 → 03 → 04 → 05 → 06 → (07 only when fully done)**.
+7. **Becoming an admin (needed for folders 03, 11, 13).** There's no admin-signup endpoint — admin
+   is granted directly in the DB. Register + verify a user through folder 01, then in a terminal:
+   ```
+   npm run admin:promote -- postman.tester@example.com
+   ```
+   That makes your test user an `ADMIN`. Log in again (folder 01 req 4) so the new role is baked
+   into a fresh session cookie. For the **SUPER_ADMIN-only** role-change (folder 13 req 4), promote
+   the row to `SUPER_ADMIN` the same way (edit the script arg or set it in the DB).
+8. **Becoming premium (needed for folder 12).** Either complete a bKash sandbox payment (folder 09)
+   **or** — much simpler for testing — have an admin grant it: folder 13 req 5 with
+   `{ "isPremium": true }` pointed at your own `target_user_id`.
+
+### The flow in one picture (why order matters)
+
+Every request either **produces** an id/cookie a later one **consumes**. You never copy anything by
+hand — each request's *Tests* script stashes what it produced into a collection variable:
+
+```
+01 Register ─(otp)→ Verify Email ─(sets session cookie + user_id)→ everything below is authenticated
+   └ (or) Login  ─ email+password → session cookie (httpOnly; Postman resends it automatically)
+06 Create Post ─(post_id)→ 07 Publish ─(execution_id)→ 07 Get Detail ─(publication_id)→ 08 Retry
+03 Create Platform ─(platform_id, platform_key)→ 05 Connect / 07 Publish target
+11 Create Feature ─(feature_id, feature_slug)→ 12 Premium list/detail
+13 List Users ─(target_user_id)→ block / role / premium → 13 Audit Log shows those actions
+09 Create Payment ─(payment_id)→ 09 Verify → premium flips
+```
+
+**About "the access token".** Unlike a typical Bearer-token API, logging in here does **not** return
+a token in the JSON body for you to paste into an `Authorization` header. Instead the server sets an
+**httpOnly cookie** (`accessToken` + `refreshToken`). Postman's cookie jar keeps it and attaches it
+to every following request automatically — so after Verify Email (or Login) you're simply "logged
+in" for the rest of the run. That's the whole auth story; there's nothing to copy.
+
+Run the folders roughly in order: **01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13**,
+then **14 (Cleanup) only when fully done**. Folders 08/09/12 depend on state from 07/09/13
+respectively (noted in each).
 
 ---
 
@@ -129,15 +185,14 @@ never a password or token field.
 `PATCH /users/me` with a new `name`. **Expected:** `200`, `data.name` reflects the change. If you
 add an `email` field to the body, it's silently ignored (by design — email isn't editable here).
 
-### 3. (Optional, needs Cloudinary) Upload Avatar
+### 3. (Optional — attach a file) Upload Avatar
 `PATCH /users/me/avatar`, multipart body.
 - **You must manually attach a file:** open the request's **Body** tab, click the `avatar` row's
   **Select Files**, and pick any small PNG/JPG from your computer. Postman can't ship a file
   inside an importable collection (security), so this one manual click is unavoidable.
-- **This repo's `.env` has empty `CLOUDINARY_*` values** — no real account configured yet. Without
-  real credentials, **this request will fail** (Cloudinary itself rejects the fake key, surfacing
-  as a `500`). That's expected, documented behavior (`docs/decisions.md`), not a bug. **Skip this
-  request** unless you've put real Cloudinary credentials in `.env` and restarted `npm run dev`.
+- **Real Cloudinary credentials are configured for this project** (see
+  `docs/credentials-setup-log.md`) — this stores the image for real. Expected: `200`,
+  `data.avatarUrl`/`data.avatarPublicId` set to a real Cloudinary URL/id.
 
 ### 4. Remove Avatar
 `DELETE /users/me/avatar`. **Expected:** `200`, `avatarUrl`/`avatarPublicId` are `null`. Safe to
@@ -196,10 +251,10 @@ you in the Postman Console.
 both fields reflect the change. `key` is deliberately not editable (immutable by design — it's
 what the backend code switches on).
 
-### 5. (Optional, needs Cloudinary) Set Platform Logo
+### 5. (Optional — attach a file) Set Platform Logo
 Same deal as the avatar upload in folder `02`: manually attach a file in the `logo` row's **Select
-Files**, and expect a `500` unless you've configured real `CLOUDINARY_*` values in `.env`. Skip
-unless you've set those up.
+Files**. Real Cloudinary credentials are configured — expected: `200`, `data.logoUrl`/
+`data.logoPublicId` set; replacing an existing logo deletes the previous asset (best-effort).
 
 ### 6. Retire Platform
 `PATCH /admin/platforms/{{platform_id}}` with `isActive: false`. **Expected:** `200`,
@@ -227,11 +282,12 @@ platform while keeping its row.
 
 ## 05 - Social Connections
 
-**Requires:** an active session (folder `01`). **Read the limitation first:** a real connection
-needs interactive OAuth consent in a browser against a real LinkedIn/Facebook app, and this repo's
-`.env` has empty provider credentials — so you **cannot** complete a live connection here. This
-folder verifies the module's manually-checkable surface; the encryption/storage/Page-selection
-behavior is proven by the automated suite (`tests/e2e/social-connections.e2e.test.ts`, 23 tests).
+**Requires:** an active session (folder `01`). Real LinkedIn OAuth credentials are configured and
+verified end-to-end (see `docs/credentials-setup-log.md`) — step 2 below produces a URL you can
+actually open in a browser and connect for real. Facebook credentials are configured too, but the
+app's Page permissions are still being finished on Facebook's side (step 6), so its consent screen
+currently errors. The encryption/storage/Page-selection behavior is also proven by the automated
+suite (`tests/e2e/social-connections.e2e.test.ts`, 23 tests) regardless.
 
 ### 1. List My Connections
 `GET /connections`. **Expected:** `200` with an empty array on a fresh account. Tokens are never
@@ -240,8 +296,9 @@ included in this response by design.
 ### 2. Start LinkedIn Connect (LIVE platform)
 `GET /connections/linkedin/connect`. **Expected:** `200` with `data.authUrl` — the LinkedIn OAuth
 URL, carrying a `state=` token this server just issued into Redis. `linkedin` is a LIVE seeded
-platform, so connect is allowed. Opening that URL to actually connect needs real `LINKEDIN_*`
-credentials in `.env`; this step only proves the endpoint issues a valid URL + state.
+platform, so connect is allowed. Open `data.authUrl` in a real browser (logged into LinkedIn) and
+click **Allow** to genuinely connect your account — real `LINKEDIN_*` credentials are configured.
+After the redirect back to `localhost`, re-run step 1 and you'll see a real connection row.
 
 ### 3. Start Connect on a non-LIVE / unknown platform (refused)
 `GET /connections/some-unknown-platform/connect`. **Expected:** `404` (no such platform). To see
@@ -258,6 +315,17 @@ nothing. A real provider redirect carries the state minted in step 2.
 `DELETE /connections/linkedin`. **Expected:** `404` — you have no LinkedIn connection to remove.
 Once a real connection exists, this hard-deletes it (physically removing the encrypted tokens) and
 returns `200`.
+
+### 6. Start Facebook Connect (LIVE platform)
+`GET /connections/facebook/connect`. **Expected:** `200` with `data.authUrl` — the Facebook OAuth
+dialog URL. `facebook` is a LIVE seeded platform, so connect is allowed. Real `FACEBOOK_APP_ID`/
+`FACEBOOK_APP_SECRET` are configured, but the app's `pages_manage_posts`/`pages_read_engagement`
+permissions are still being finished on Facebook's side — opening this URL currently shows
+Facebook's "Invalid Scopes" developer-only error instead of a real consent screen. Once resolved,
+opening it in a browser (logged into an account that administers a Facebook Page) shows a
+Page-picker if you administer more than one Page, or auto-selects if you only have one — that
+flow continues through `GET /connections/facebook/pages` and `POST /connections/facebook/select-page`
+(only meaningful mid-flow after a real browser redirect, not standalone requests here).
 
 **✅ Checkpoint:** move to `06`.
 
@@ -286,11 +354,11 @@ multipart — you only need multipart when attaching an image.
 `POST /posts` with content containing "unicorns". **Expected:** `201`. Gives steps 4–5 something to
 find — a second post, plus a deterministic search hit.
 
-### 3. (Optional, needs Cloudinary) Create Post With Image
+### 3. (Optional — attach a file) Create Post With Image
 `POST /posts`, multipart. **Manually attach** a small PNG/JPG via the `image` row's **Select Files**.
-- **Expected without creds:** `500` — this repo's `.env` has empty `CLOUDINARY_*`, so the upload fails
-  at Cloudinary (exactly like the avatar/logo uploads). Expected, not a bug — **skip unless** you've
-  put real credentials in `.env` and restarted `npm run dev`. Steps 1–2 already prove creation works.
+- Real Cloudinary credentials are configured — attaching a file stores it for real. Expected: `201`
+  with `data.imageUrl`/`data.imagePublicId` set (or both `null` if you skip attaching a file —
+  steps 1–2 already prove creation works either way).
 
 ### 4. List My Posts (pagination + meta)
 `GET /posts?page=1&limit=10`. **Expected:** `200` with `data` (an array) and `meta` =
@@ -328,7 +396,179 @@ a fact the automated suite asserts directly.
 
 ---
 
-## 07 - Cleanup (optional — run at most ONE, LAST, if at all)
+## 07 - Publishing & Execution
+
+**Goal:** turn a saved post into a real publish job and watch its result cascade.
+**Needs:** a `post_id` (folder 06) and a `platform_key` (folder 03/04). For a *successful* post you
+also need a live connection (folder 05); without one, publishing is refused (400).
+
+### 1. Publish a Post
+Sends `{ "platforms": ["{{platform_key}}"] }` to `/posts/{{post_id}}/publish`. This creates the
+execution + publication rows synchronously, enqueues a BullMQ job, and returns **202** immediately
+with `data.executionId` (saved to `execution_id`) and `data.status = PENDING` — the HTTP request
+comes back before the actual social API call runs (so a browser could close). Real posting happens
+in the background worker.
+
+- **With a real connection:** the worker calls LinkedIn/Facebook; status ends SUCCESS.
+- **With a seeded/fake connection or expired token:** the worker's provider call fails; status ends
+  **FAILED** with a sanitized reason (the access token is never leaked into it). Both are valid to
+  observe — the point is the row/status machinery works.
+- **With no connection for that platform:** you get **400** here, before anything is enqueued.
+
+### 2. List My Executions
+`GET /executions?page=1&limit=10` — your publish history, newest first, with `meta` pagination. Add
+`?status=PENDING|RUNNING|COMPLETED|PARTIALLY_COMPLETED|FAILED` (the overall execution status —
+each platform's own result inside one execution is SUCCESS/FAILED, see the detail request below)
+or `?dateFrom=&dateTo=` to filter.
+
+### 3. Get Execution Detail
+`GET /executions/{{execution_id}}` — the published content plus each platform's `status`,
+`externalPostUrl` on success, latest failure reason, and a `retryable` flag. The Tests script grabs
+the first FAILED (or first) publication's id into `publication_id` for folder 08.
+
+**✅ Checkpoint:** a 202 on publish, the execution shows up in the list, and detail shows one row per
+selected platform with a sensible status.
+
+---
+
+## 08 - Retry a Failed Publish
+
+**Goal:** re-run failed work. **Needs:** an execution with at least one FAILED publication (from
+folder 07). If everything succeeded, these correctly return 400 — nothing to retry.
+
+### 1. Retry One Publication
+`POST /publications/{{publication_id}}/retry` → **202**. The worker appends a new attempt (#N) and
+recomputes the parent execution's status. Retrying a non-failed publication is rejected.
+
+### 2. Retry Whole Execution
+`POST /executions/{{execution_id}}/retry` → **202**. Retries *all* failed publications in the
+execution at once; **400** if there are none.
+
+**✅ Checkpoint:** a 202, and re-fetching the execution detail (folder 07 req 3) shows a new attempt.
+
+---
+
+## 09 - Premium Payment (bKash sandbox)
+
+**Goal:** buy premium with test money. **Needs:** real `BKASH_*` **sandbox** credentials in `.env`
+(without them, req 1 returns a gateway error — that's expected, and you can still test the
+premium *features* by granting premium via admin, folder 13 req 5).
+
+### 1. Create Payment
+`POST /payments/create` (no body — amount/currency come from server config). Returns **201** with
+`data.paymentId` (your **local** payment row id — the only id you ever need; the bKash gateway's
+own session id is stored server-side and never returned to the client) and `data.redirectUrl`
+(open it in a browser to complete the sandbox payment). `payment_id` is captured automatically.
+
+### 2. Verify Payment
+`POST /payments/verify` with `{ "paymentId": "{{payment_id}}" }` — nothing to paste, it reuses the
+id captured in step 1. This is the authoritative, idempotent check — premium (`user.isPremium`)
+only flips **after** the gateway itself confirms the payment completed. Expected **200**.
+
+> The browser-redirect callback `GET /payments/callback` is called by **bKash**, not you — it
+> redirects to the frontend success/failure page, so there's no Postman request for it.
+
+### 3. Get One Payment Status
+`GET /payments/{{payment_id}}` → **200**, `data.status` goes PENDING → SUCCESS once verified (or
+FAILED / CANCELLED on a failed/cancelled sandbox payment).
+
+**✅ Checkpoint:** with sandbox creds, you can create → open URL → pay → verify → see SUCCESS and
+`isPremium` true (check `GET /users/me`).
+
+---
+
+## 10 - Payment History
+
+**Goal:** read back what you paid. **Needs:** at least one payment from folder 09 (optional).
+
+### 1. List My Payments
+`GET /payments?page=1&limit=10` — owner-scoped, newest first, `meta` pagination. Filter with
+`?status=PENDING|SUCCESS|FAILED|CANCELLED`. Expected **200**.
+
+### 2. Get Payment By Id
+`GET /payments/{{payment_id}}` — one payment's status; **404** if the id isn't yours (ownership is
+enforced).
+
+---
+
+## 11 - Upcoming Features (Admin)
+
+**Goal:** manage the premium "what's coming" catalogue. **Needs:** an **ADMIN** session (see
+"Becoming an admin" in section 0). A non-admin gets **403** on every request here.
+
+### 1. Create Upcoming Feature
+`POST /admin/upcoming-features`. `slug` must be a lowercase slug (`[a-z0-9-]`); `status` is one of
+the `UpcomingFeatureStatus` enum: `COMING_SOON`, `IN_DEVELOPMENT`, or `PLANNED`. Saves `feature_id` and
+`feature_slug`. Expected **201**.
+
+### 2–3. List All / Get By Id
+`GET /admin/upcoming-features` (admin view — includes non-visible rows) and
+`GET /admin/upcoming-features/{{feature_id}}`. Both **200**.
+
+### 4. Update Feature
+`PATCH /admin/upcoming-features/{{feature_id}}` — partial update (e.g. bump `status`). **200**.
+
+### 5. (Optional — attach a file) Set Feature Image
+`PATCH /admin/upcoming-features/{{feature_id}}/image` — multipart `image` file field. Real
+Cloudinary credentials are configured — expected: `200` with `data.imageUrl`/`data.imagePublicId` set.
+
+### 6. Delete Feature
+`DELETE /admin/upcoming-features/{{feature_id}}` — hard delete (admin catalogue, not soft-deleted).
+Run last. **200**.
+
+---
+
+## 12 - Upcoming Features (Premium user)
+
+**Goal:** see the same catalogue as a paying user. **Needs:** `isPremium = true` on your account
+(folder 09 payment, or admin grant folder 13 req 5). A non-premium session gets **403**.
+
+### 1. List Visible Features
+`GET /upcoming-features` — premium-visible rows only. **200** as premium, **403** otherwise.
+
+### 2. Get Feature By Slug
+`GET /upcoming-features/{{feature_slug}}` — **200** (premium) / **403** (non-premium) / **404**
+(unknown slug).
+
+**✅ Checkpoint:** flip premium off (folder 13 req 5, `isPremium:false`) and confirm these turn 403 —
+proves the gate is real.
+
+---
+
+## 13 - Admin — Users & Audit Log
+
+**Goal:** admin user management + the audit trail it writes. **Needs:** **ADMIN** (and **SUPER_ADMIN**
+for the role change, req 4).
+
+### 1. List Users
+`GET /admin/users?page=1&limit=10` — safe projection (no hashes/tokens), `?search=` supported. Saves
+the first user's id to `target_user_id`. **Re-point `target_user_id` at a throwaway user** (in the
+Variables tab) before the mutating requests, so you don't block or demote yourself.
+
+### 2. Get User By Id
+`GET /admin/users/{{target_user_id}}` → **200** / **404**.
+
+### 3. Block / Unblock
+`PATCH /admin/users/{{target_user_id}}/status` with `{ "status": "BLOCKED" }` (or `ACTIVE`). Writes a
+`USER_BLOCKED`/`USER_UNBLOCKED` audit entry. **200**.
+
+### 4. Change Role (SUPER_ADMIN only)
+`PATCH /admin/users/{{target_user_id}}/role` with `{ "role": "ADMIN" }`. **200** as SUPER_ADMIN,
+**403** as a plain ADMIN (admins can't escalate roles — by design). Audited `USER_ROLE_CHANGED`.
+
+### 5. Grant / Revoke Premium
+`PATCH /admin/users/{{target_user_id}}/premium` with `{ "isPremium": true }`. The fast way to unlock
+folder 12 for a test user (point `target_user_id` at yourself). Audited `USER_PREMIUM_GRANTED/REVOKED`.
+
+### 6. List Audit Logs
+`GET /admin/audit-logs?page=1&limit=20` — append-only trail (actor, action, entity, metadata, ip/ua).
+You should see the entries written by requests 3–5 above.
+
+**✅ Checkpoint:** a mutation in 3–5 shows up as a new row in req 6 — the audit log is wired end-to-end.
+
+---
+
+## 14 - Cleanup (optional — run at most ONE, LAST, if at all)
 
 **⚠️ These are two ALTERNATIVE endings, not a sequence — run at most one.** Most of the time you'll
 run neither and just leave your test data in place for next time.
@@ -358,7 +598,12 @@ fail with `401` if run beforehand. Pick one, don't run both.
 | `403` on `03 - Platform Catalogue (Admin)` requests | Test user isn't `ADMIN` yet | Run `npm run admin:promote -- <test_email>` (no re-login needed). |
 | `409` on Register | `test_email` already has a verified account | Either run Login instead (see folder `01` step 1's note), or pick a new `test_email` in Variables. |
 | `400 "expired"` on Verify Email / Reset Password | OTP is >5 minutes old | Re-run the request that generates it (Register / Forgot Password), then retry immediately. |
-| `500` on avatar / logo / post-image upload | `CLOUDINARY_*` in `.env` is empty (placeholder) | Expected without real credentials — skip that request, or configure a real Cloudinary account and restart `npm run dev`. |
+| `500` on avatar / logo / post-image upload | Real Cloudinary credentials are configured, so this shouldn't normally happen | Check the attached file is actually an image and under the size limit, and that `npm run dev` picked up `.env` (restart it if you changed `.env` recently). |
+| `403` on `11`/`13` (admin) requests | Test user isn't `ADMIN` | `npm run admin:promote -- <test_email>`, then re-run Login (`01` step 4) for a fresh cookie. |
+| `403` on `12` (premium) requests | Account isn't premium | Grant it: `13` req 5 with `{ "isPremium": true }` on your own `target_user_id` (or complete a `09` payment). |
+| `400` on `07 - Publish` | No connection for that platform key, or platform not LIVE | Connect it first (`05`), or expect FAILED (not 400) once a connection row exists. |
+| `07 - Publish` execution ends `FAILED` | Fake/expired connection token → provider call rejected | Expected without real OAuth — the row/status machinery is what you're verifying here. |
+| Gateway error on `09 - Create Payment` | `BKASH_*` sandbox creds in `.env` are empty | Add real bKash sandbox creds, or skip payment and grant premium via admin (`13` req 5). |
 | Want to run the whole collection again from scratch | Users/platforms from the last run still exist | Change `test_email` (and re-run `admin:promote` with the new value) — `Create Platform`'s `{{$timestamp}}` key never needs changing. |
 
 ## Reference — every endpoint in this collection
@@ -395,3 +640,27 @@ fail with `401` if run beforehand. Pick one, don't run both.
 | GET | `/api/v1/posts` | session | Content Posts |
 | GET | `/api/v1/posts/:id` | session | Content Posts |
 | DELETE | `/api/v1/posts/:id` | session | Content Posts |
+| POST | `/api/v1/posts/:id/publish` | session | Publishing & Execution |
+| GET | `/api/v1/executions` | session | Publishing & Execution |
+| GET | `/api/v1/executions/:id` | session | Publishing & Execution |
+| POST | `/api/v1/publications/:id/retry` | session | Retry |
+| POST | `/api/v1/executions/:id/retry` | session | Retry |
+| POST | `/api/v1/payments/create` | session | Premium Payment |
+| GET | `/api/v1/payments/callback` | gateway (bKash) | Premium Payment |
+| POST | `/api/v1/payments/verify` | session | Premium Payment |
+| GET | `/api/v1/payments` | session | Payment History |
+| GET | `/api/v1/payments/:id` | session | Payment History |
+| POST | `/api/v1/admin/upcoming-features` | ADMIN/SUPER_ADMIN | Upcoming Features |
+| GET | `/api/v1/admin/upcoming-features` | ADMIN/SUPER_ADMIN | Upcoming Features |
+| GET | `/api/v1/admin/upcoming-features/:id` | ADMIN/SUPER_ADMIN | Upcoming Features |
+| PATCH | `/api/v1/admin/upcoming-features/:id` | ADMIN/SUPER_ADMIN | Upcoming Features |
+| PATCH | `/api/v1/admin/upcoming-features/:id/image` | ADMIN/SUPER_ADMIN | Upcoming Features |
+| DELETE | `/api/v1/admin/upcoming-features/:id` | ADMIN/SUPER_ADMIN | Upcoming Features |
+| GET | `/api/v1/upcoming-features` | session + premium | Upcoming Features |
+| GET | `/api/v1/upcoming-features/:slug` | session + premium | Upcoming Features |
+| GET | `/api/v1/admin/users` | ADMIN/SUPER_ADMIN | Admin — Users & Audit |
+| GET | `/api/v1/admin/users/:id` | ADMIN/SUPER_ADMIN | Admin — Users & Audit |
+| PATCH | `/api/v1/admin/users/:id/status` | ADMIN/SUPER_ADMIN | Admin — Users & Audit |
+| PATCH | `/api/v1/admin/users/:id/role` | SUPER_ADMIN | Admin — Users & Audit |
+| PATCH | `/api/v1/admin/users/:id/premium` | ADMIN/SUPER_ADMIN | Admin — Users & Audit |
+| GET | `/api/v1/admin/audit-logs` | ADMIN/SUPER_ADMIN | Admin — Users & Audit |

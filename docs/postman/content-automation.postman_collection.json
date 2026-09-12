@@ -2,20 +2,84 @@
 	"info": {
 		"_postman_id": "c0a1e8b0-0000-4000-a000-000000000001",
 		"name": "Content Automation Platform — Manual Test Walkthrough",
-		"description": "Sequential, self-chaining walkthrough for the modules implemented so far: Auth, User Profile, Platform Catalogue (admin + public), Social Connections, Content Posts. Run folders top to bottom, request by request, inside each folder. See docs/manual-testing-guide.md for the full step-by-step instructions — this file is the companion collection to import.\n\nEverything a later request needs (OTP, user id, platform id, session cookies) is captured automatically by each request's Tests script into collection variables — you never need to copy/paste a value by hand. The only things you might edit yourself are the `test_email`/`test_password` variables (Variables tab), and only if you're re-running the whole thing from scratch.",
+		"description": "Sequential, self-chaining walkthrough for every module implemented so far (all 12 planned OpenSpec changes): Auth, User Profile, Platform Catalogue (admin + public), Social Connections (LinkedIn + Facebook), Content Posts, Publishing & Execution, Retry, Premium Payment (bKash sandbox), Payment History, Upcoming Features (admin + premium user), and Admin Users/Audit Log. Run folders top to bottom, request by request, inside each folder. See docs/manual-testing-guide.md for the full step-by-step instructions and docs/credentials-setup-log.md for how the third-party credentials (Cloudinary, LinkedIn, Facebook, SMTP) were configured — this file is the companion collection to import.\n\nEverything a later request needs (OTP, user id, platform id, session cookies) is captured automatically by each request's Tests script into collection variables — you never need to copy/paste a value by hand. The only things you might edit yourself are the `test_email`/`test_password` variables (Variables tab), and only if you're re-running the whole thing from scratch.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
-		{ "key": "base_url", "value": "http://localhost:5000/api/v1", "type": "string" },
-		{ "key": "test_email", "value": "postman.tester@example.com", "type": "string" },
-		{ "key": "test_password", "value": "TestPassword123!", "type": "string" },
-		{ "key": "new_password", "value": "NewPassword456!", "type": "string" },
-		{ "key": "otp", "value": "", "type": "string" },
-		{ "key": "reset_otp", "value": "", "type": "string" },
-		{ "key": "user_id", "value": "", "type": "string" },
-		{ "key": "platform_id", "value": "", "type": "string" },
-		{ "key": "platform_key", "value": "", "type": "string" },
-		{ "key": "post_id", "value": "", "type": "string" }
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "test_email",
+			"value": "postman.tester@example.com",
+			"type": "string"
+		},
+		{
+			"key": "test_password",
+			"value": "TestPassword123!",
+			"type": "string"
+		},
+		{
+			"key": "new_password",
+			"value": "NewPassword456!",
+			"type": "string"
+		},
+		{
+			"key": "otp",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "reset_otp",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "platform_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "platform_key",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "post_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "execution_id",
+			"value": ""
+		},
+		{
+			"key": "publication_id",
+			"value": ""
+		},
+		{
+			"key": "payment_id",
+			"value": ""
+		},
+		{
+			"key": "feature_id",
+			"value": ""
+		},
+		{
+			"key": "feature_slug",
+			"value": ""
+		},
+		{
+			"key": "target_user_id",
+			"value": ""
+		}
 	],
 	"item": [
 		{
@@ -51,11 +115,20 @@
 					],
 					"request": {
 						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"name\": \"Postman Tester\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/auth/register",
 						"description": "Starts registration. Creates NO user row yet — just an OTP in Redis + (because EXPOSE_OTP_IN_RESPONSE=true in .env) the OTP in this response's `data.otp`, captured automatically into the `otp` variable for the next request.\n\nExpected: 200 the first time. 409 means `test_email` already has a verified account — see the Tests script output in the Postman Console (View > Show Postman Console) for what to do next."
@@ -87,11 +160,20 @@
 					],
 					"request": {
 						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"email\": \"{{test_email}}\",\n  \"otp\": \"{{otp}}\"\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/auth/verify-email",
 						"description": "Completes registration using the `otp` captured by the previous request, creates the user, and logs you in (sets httpOnly `accessToken`/`refreshToken` cookies — Postman's cookie jar stores and resends these automatically on every request that follows, no manual header needed).\n\nExpected: 201, with the created user in `data` (no password ever included). If this 400s with 'expired', the OTP is more than 5 minutes old — re-run '1. Register' to get a fresh one."
@@ -110,11 +192,20 @@
 					"name": "4. (Optional) Login",
 					"request": {
 						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/auth/login",
 						"description": "Only needed if you skipped Verify Email because your test_email was already verified (see Register's 409 note), or if you want to re-prove login works. Safe to run any time — just re-issues the same session cookies. Expected: 200."
@@ -151,11 +242,20 @@
 					],
 					"request": {
 						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"email\": \"{{test_email}}\"\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/auth/forgot-password",
 						"description": "Generates a password-reset code (captured into `reset_otp`). Always returns the same generic message whether or not the email exists (no account enumeration) — that's expected, not a bug. Does NOT touch your current session; safe to run any time."
@@ -182,11 +282,20 @@
 					],
 					"request": {
 						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"email\": \"{{test_email}}\",\n  \"otp\": \"{{reset_otp}}\",\n  \"newPassword\": \"{{new_password}}\"\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/auth/reset-password",
 						"description": "Uses the `reset_otp` from the previous request to set a new password. Run '6. (Optional) Forgot Password' immediately before this one (the code expires in 5 minutes). Does NOT end your current session (cookies untouched) — safe mid-flow. After this runs, the `test_password` variable is auto-updated so every later request that logs in again keeps working."
@@ -211,27 +320,42 @@
 					"name": "2. Update My Profile",
 					"request": {
 						"method": "PATCH",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"name\": \"Postman Tester (Updated)\"\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/users/me",
 						"description": "Expected: 200, `data.name` reflects the change. Only `name` is editable here — an `email` field in the body is silently ignored by design."
 					}
 				},
 				{
-					"name": "3. (Optional, needs Cloudinary) Upload Avatar",
+					"name": "3. (Optional — attach a file) Upload Avatar",
 					"request": {
 						"method": "PATCH",
 						"header": [],
 						"body": {
 							"mode": "formdata",
-							"formdata": [{ "key": "avatar", "type": "file", "src": [] }]
+							"formdata": [
+								{
+									"key": "avatar",
+									"type": "file",
+									"src": []
+								}
+							]
 						},
 						"url": "{{base_url}}/users/me/avatar",
-						"description": "⚠️ Click the 'avatar' row's 'Select Files' button and pick any small PNG/JPG from your computer — Postman can't auto-attach a file from a collection for security reasons.\n\nThis repo's .env has EMPTY CLOUDINARY_* values (no real account configured). Without real credentials this request WILL fail (a 500 from Cloudinary rejecting the fake key) — that's expected, not a bug (see docs/decisions.md). Skip this request unless you've put real Cloudinary credentials in .env and restarted the server."
+						"description": "⚠️ Click the 'avatar' row's 'Select Files' button and pick any small PNG/JPG from your computer — Postman can't auto-attach a file from a collection for security reasons.\n\nReal Cloudinary credentials are configured for this project (see docs/credentials-setup-log.md) — this stores the image for real. Expected: 200, `data.avatarUrl`/`data.avatarPublicId` are set to a real Cloudinary URL/id."
 					}
 				},
 				{
@@ -264,11 +388,20 @@
 					],
 					"request": {
 						"method": "PATCH",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"currentPassword\": \"{{test_password}}\",\n  \"newPassword\": \"{{new_password}}\"\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/users/me/password",
 						"description": "Expected: 200. `currentPassword` always uses whatever `test_password` currently holds (kept in sync automatically), so this works whether or not you ran '7. (Optional) Reset Password' earlier."
@@ -305,11 +438,20 @@
 					],
 					"request": {
 						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"key\": \"postman-platform-{{$timestamp}}\",\n  \"name\": \"Postman Test Platform\",\n  \"status\": \"LIVE\",\n  \"sortOrder\": 99,\n  \"isActive\": true\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/admin/platforms",
 						"description": "`key` uses Postman's built-in `{{$timestamp}}` dynamic variable so it's always unique — you can re-run this request as many times as you like without ever hitting a duplicate-key 409, unlike Register.\n\nExpected: 201. If you get 403, your test user isn't ADMIN yet — see this folder's description."
@@ -337,38 +479,62 @@
 					"name": "4. Update Platform",
 					"request": {
 						"method": "PATCH",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"name\": \"Postman Test Platform (Updated)\",\n  \"sortOrder\": 50\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/admin/platforms/{{platform_id}}",
 						"description": "Expected: 200, `data.name`/`data.sortOrder` reflect the change. `key` is deliberately not editable here (immutable by design)."
 					}
 				},
 				{
-					"name": "5. (Optional, needs Cloudinary) Set Platform Logo",
+					"name": "5. (Optional — attach a file) Set Platform Logo",
 					"request": {
 						"method": "PATCH",
 						"header": [],
 						"body": {
 							"mode": "formdata",
-							"formdata": [{ "key": "logo", "type": "file", "src": [] }]
+							"formdata": [
+								{
+									"key": "logo",
+									"type": "file",
+									"src": []
+								}
+							]
 						},
 						"url": "{{base_url}}/admin/platforms/{{platform_id}}/logo",
-						"description": "⚠️ Click the 'logo' row's 'Select Files' button and pick any small PNG/JPG. Same Cloudinary caveat as the avatar upload in 02 - User Profile: this repo's .env has empty CLOUDINARY_* values, so without real credentials this request WILL fail (expected, not a bug). Skip unless you've configured real Cloudinary credentials."
+						"description": "⚠️ Click the 'logo' row's 'Select Files' button and pick any small PNG/JPG. Real Cloudinary credentials are configured for this project (same as the avatar upload) — expected: 200, `data.logoUrl`/`data.logoPublicId` are set; replacing an existing logo deletes the previous asset (best-effort)."
 					}
 				},
 				{
 					"name": "6. Retire Platform",
 					"request": {
 						"method": "PATCH",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"isActive\": false\n}",
-							"options": { "raw": { "language": "json" } }
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						},
 						"url": "{{base_url}}/admin/platforms/{{platform_id}}",
 						"description": "Expected: 200, `data.isActive` is now false. The record is NOT deleted (run '2. List All Platforms' again to confirm it's still there) — only hidden from the public active list, which is exactly what the next folder proves."
@@ -393,7 +559,7 @@
 		},
 		{
 			"name": "05 - Social Connections",
-			"description": "Requires an active session — run 01 - Auth first.\n\n⚠️ IMPORTANT — what's testable without real OAuth apps: this repo's .env has EMPTY LinkedIn/Facebook credentials, and completing a real connection requires interactive OAuth consent in a browser against a real provider app (which can't be scripted). So the full connect→publish flow is NOT exercisable here. What you CAN verify manually below: the endpoints exist, are session-guarded, gate on LIVE platforms, issue an OAuth URL + anti-forgery state, reject a forged callback, and enforce ownership on disconnect. The token encryption / storage / Page-selection behavior is fully covered by the automated suite (tests/e2e/social-connections.e2e.test.ts).",
+			"description": "Requires an active session — run 01 - Auth first.\n\n✅ Real LinkedIn OAuth credentials are configured for this project (see docs/credentials-setup-log.md) and verified end-to-end — opening the authUrl from request 2 in a real browser and clicking Allow genuinely connects your account. ⏳ Facebook credentials are also configured (App ID/Secret + redirect URI), but the app's Page permissions (`pages_manage_posts`, `pages_read_engagement`) are still being finished on Facebook's side — see folder 05b.\n\nWhat you can verify by hand below regardless: the endpoints exist, are session-guarded, gate on LIVE platforms, issue an OAuth URL + anti-forgery state, reject a forged callback, and enforce ownership on disconnect. The token encryption / storage / Page-selection behavior is also fully covered by the automated suite (tests/e2e/social-connections.e2e.test.ts).",
 			"item": [
 				{
 					"name": "1. List My Connections",
@@ -410,7 +576,7 @@
 						"method": "GET",
 						"header": [],
 						"url": "{{base_url}}/connections/linkedin/connect",
-						"description": "Expected: 200 with `data.authUrl` — the LinkedIn OAuth URL (contains a `state=` anti-forgery token this server just issued into Redis). `linkedin` is a LIVE seeded platform, so connect is allowed.\n\nTo ACTUALLY connect you would open that authUrl in a browser and consent — but that needs real LINKEDIN_CLIENT_ID/SECRET in .env (they're empty here), so the URL will error at LinkedIn. This step only proves the connect endpoint issues a valid URL + state."
+						"description": "Expected: 200 with `data.authUrl` — the LinkedIn OAuth URL (contains a `state=` anti-forgery token this server just issued into Redis). `linkedin` is a LIVE seeded platform, so connect is allowed.\n\n✅ Real LINKEDIN_CLIENT_ID/SECRET are configured — copy `data.authUrl` into a real browser (logged into LinkedIn) and click Allow to genuinely connect your account. After the redirect back to localhost, re-run '1. List My Connections' above and you'll see a real row with your LinkedIn display name and a token expiry ~2 months out."
 					}
 				},
 				{
@@ -437,7 +603,54 @@
 						"method": "DELETE",
 						"header": [],
 						"url": "{{base_url}}/connections/linkedin",
-						"description": "Expected: 404 — you have no LinkedIn connection to remove (you never completed a real OAuth connect). Once a real connection exists, this hard-deletes it (physically removing the encrypted tokens) and returns 200."
+						"description": "Expected: 404 if you never completed a real LinkedIn connect above, or 200 (hard-deletes the connection, physically removing the encrypted tokens) if you did."
+					}
+				}
+			]
+		},
+		{
+			"name": "05b - Social Connections (Facebook)",
+			"description": "Same session requirement as 05. Split out because Facebook's connect is a two-step flow (user token → pick a Page) that needs a real browser redirect, unlike LinkedIn's single step.",
+			"item": [
+				{
+					"name": "1. Start Facebook Connect (LIVE platform)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/connections/facebook/connect",
+						"description": "Expected: 200 with `data.authUrl` — the Facebook OAuth dialog URL (contains a `state=` anti-forgery token). `facebook` is a LIVE seeded platform, so connect is allowed.\n\n⏳ Real FACEBOOK_APP_ID/SECRET are configured, but the app's `pages_manage_posts`/`pages_read_engagement` permissions are still being finished on Facebook's side (see docs/credentials-setup-log.md) — opening this URL currently shows Facebook's 'Invalid Scopes' developer-only error instead of a real consent screen. Once resolved, opening it in a browser (logged into an account that administers a Facebook Page) shows a Page-picker if you administer more than one, or auto-selects if you only have one."
+					}
+				},
+				{
+					"name": "2. List Held Facebook Pages (mid-flow only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/connections/facebook/pages",
+						"description": "Only meaningful right after a real browser redirect from request 1 leaves a Page-selection stash in Redis. Expected: 200 with the Pages you administer (no tokens), or 400 ('No Facebook Page selection in progress') if you call it cold, as you would here without completing request 1 in a browser first."
+					}
+				},
+				{
+					"name": "3. Select a Facebook Page (mid-flow only)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"pageId\": \"PASTE_A_PAGE_ID_FROM_REQUEST_2_HERE\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/connections/facebook/select-page",
+						"description": "Stores the chosen Page's token as the connection (encrypted) and clears the transient stash. Only meaningful right after request 2 actually returned Pages. Expected: 200 with the new connection, or 400 if there's no selection in progress or the pageId isn't among the held Pages."
 					}
 				}
 			]
@@ -531,7 +744,7 @@
 					}
 				},
 				{
-					"name": "3. (Optional, needs Cloudinary) Create Post With Image",
+					"name": "3. (Optional — attach a file) Create Post With Image",
 					"event": [
 						{
 							"listen": "test",
@@ -539,22 +752,19 @@
 								"type": "text/javascript",
 								"exec": [
 									"(function () {",
-									"    // Three valid outcomes, so this folder stays green however you run it:",
-									"    //   201 + imageUrl set   -> a file was attached AND real CLOUDINARY_* creds exist.",
+									"    // Two valid outcomes, so this folder stays green however you run it:",
+									"    //   201 + imageUrl set   -> a file was attached and stored for real (Cloudinary is configured).",
 									"    //   201 + imageUrl null  -> no file attached (the collection default / Newman) -> created as a text post.",
-									"    //   500                  -> a file WAS attached but CLOUDINARY_* is empty in .env (expected here).",
-									"    pm.test('201 (created) or 500 (image upload without Cloudinary creds — expected)', function () {",
-									"        pm.expect([201, 500]).to.include(pm.response.code);",
+									"    pm.test('Post created (201)', function () {",
+									"        pm.response.to.have.status(201);",
 									"    });",
 									"    if (pm.response.code === 201) {",
 									"        var post = pm.response.json().data;",
 									"        if (post.imageUrl) {",
 									"            console.log('Image stored on the post:', post.imageUrl);",
 									"        } else {",
-									"            console.log('No file was attached — created as a text post. To exercise the image path, attach a PNG/JPG in Body > form-data (image row > Select Files) and set real CLOUDINARY_* creds in .env.');",
+									"            console.log('No file was attached — created as a text post. To exercise the image path, attach a PNG/JPG in Body > form-data (image row > Select Files).');",
 									"        }",
-									"    } else {",
-									"        console.log('500 = a file was attached but CLOUDINARY_* is empty in .env (expected). Put real creds in .env + restart npm run dev to store an image.');",
 									"    }",
 									"})();"
 								]
@@ -580,7 +790,7 @@
 							]
 						},
 						"url": "{{base_url}}/posts",
-						"description": "⚠️ Click the 'image' row's 'Select Files' button and pick any small PNG/JPG — Postman can't auto-attach a file from an imported collection.\n\nThis repo's .env has EMPTY CLOUDINARY_* values, so without real credentials this request WILL fail with a 500 (Cloudinary rejecting the fake key) — expected, not a bug, same caveat as the avatar/logo uploads. Skip it unless you've configured real Cloudinary credentials and restarted the server. The 'without image' path (requests 1–2) fully proves post creation regardless."
+						"description": "⚠️ Click the 'image' row's 'Select Files' button and pick any small PNG/JPG — Postman can't auto-attach a file from an imported collection.\n\nReal Cloudinary credentials are configured for this project — attaching a file stores it for real. Expected: 201 with `data.imageUrl`/`data.imagePublicId` set when a file is attached, or 201 with both null if you skip attaching one (the 'without image' path, requests 1–2, already proves post creation either way)."
 					}
 				},
 				{
@@ -788,7 +998,462 @@
 			]
 		},
 		{
-			"name": "07 - Cleanup (optional — run at most ONE of these, LAST)",
+			"name": "07 - Publishing & Execution",
+			"item": [
+				{
+					"name": "1. Publish a Post (start background job)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{base_url}}/posts/{{post_id}}/publish",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"platforms\": [\"{{platform_key}}\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"description": "Kicks off a background publish of `post_id` to the given platform key(s). The platform must be LIVE **and** you must have a social connection for it (folder 05). Without a connection the service refuses (400).\n\nExpected on success: 202 Accepted with `data.executionId` and `data.status = PENDING`. The Tests script saves `data.executionId` into `execution_id`. Real posting to LinkedIn/Facebook only happens if you completed real OAuth; otherwise the execution will move to FAILED — inspect it in the next requests."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Publish accepted (202)', function () { pm.expect(pm.response.code).to.eql(202); });",
+									"    if (pm.response.code === 202) {",
+									"        var d = pm.response.json().data;",
+									"        pm.collectionVariables.set('execution_id', d.executionId);",
+									"        console.log('Captured execution_id:', d.executionId, '| status:', d.status);",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2. List My Executions (history + meta)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/executions?page=1&limit=10",
+						"description": "Owner-scoped publish history, newest first, paginated. Filter with `?status=PENDING|RUNNING|COMPLETED|PARTIALLY_COMPLETED|FAILED` (the overall execution status — each platform's own result inside one execution is SUCCESS/FAILED, see the detail request below) and `?dateFrom=&dateTo=`.\n\nExpected: 200 with `data` array + `meta` pagination."
+					}
+				},
+				{
+					"name": "3. Get Execution Detail (per-platform result)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/executions/{{execution_id}}",
+						"description": "Full detail for one execution: the published content plus each platform's `status`, `externalPostUrl` on success, the latest sanitized failure reason, and a `retryable` flag. The Tests script captures the first FAILED (or first) publication's id into `publication_id` for the retry folder.\n\nExpected: 200."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Execution fetched (200)', function () { pm.response.to.have.status(200); });",
+									"    if (pm.response.code === 200) {",
+									"        var pubs = pm.response.json().data.publications || [];",
+									"        var target = pubs.find(function (p) { return p.status === 'FAILED'; }) || pubs[0];",
+									"        if (target) {",
+									"            pm.collectionVariables.set('publication_id', target.id);",
+									"            console.log('Captured publication_id:', target.id, '| status:', target.status);",
+									"        }",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					]
+				}
+			],
+			"description": "Trigger a publish and read its history. Needs a post (folder 06) and, for real publishing, a live connection (folder 05)."
+		},
+		{
+			"name": "08 - Retry a Failed Publish",
+			"item": [
+				{
+					"name": "1. Retry One Publication",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": "{{base_url}}/publications/{{publication_id}}/retry",
+						"description": "Retries a single FAILED publication (id captured in folder 07 req 3). Only FAILED ones are retryable — retrying a SUCCESS one returns 400/409.\n\nExpected: 202 Accepted (worker re-runs it in the background)."
+					}
+				},
+				{
+					"name": "2. Retry Whole Execution",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": "{{base_url}}/executions/{{execution_id}}/retry",
+						"description": "Retries every FAILED publication in the execution at once. If none are failed, returns 400 ('no failed publications to retry').\n\nExpected: 202 Accepted."
+					}
+				}
+			],
+			"description": "Retry endpoints. Only meaningful after an execution has FAILED publications."
+		},
+		{
+			"name": "09 - Premium Payment (bKash sandbox)",
+			"item": [
+				{
+					"name": "1. Create Payment (get gateway URL)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{base_url}}/payments/create",
+						"description": "Starts a bKash SANDBOX payment for the premium upgrade. Amount/currency come from server config — you send no body.\n\nExpected: 201 with `data.paymentId` (your **local** payment row id — the only id you ever need; the bKash gateway's own session id is stored server-side and never returned to the client) and `data.redirectUrl` (open this in a browser to complete the sandbox payment). The Tests script captures `data.paymentId` into `payment_id` automatically — nothing to paste by hand. NOTE: needs valid BKASH_* sandbox creds in `.env`; without them this returns a gateway error."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Payment initiated (201)', function () { pm.response.to.have.status(201); });",
+									"    if (pm.response.code === 201) {",
+									"        var d = pm.response.json().data;",
+									"        if (d.paymentId) pm.collectionVariables.set('payment_id', d.paymentId);",
+									"        console.log('Captured payment_id:', d.paymentId);",
+									"        console.log('Open this URL in a browser to complete the sandbox payment:', d.redirectUrl);",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2. Verify Payment (re-check safety net)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{base_url}}/payments/verify",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"paymentId\": \"{{payment_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"description": "Idempotent server-side re-verification. `paymentId` is auto-filled from the `payment_id` variable captured in request 1 — nothing to paste. On a completed sandbox payment this flips `user.isPremium` true.\n\nExpected: 200. Backend is authoritative — premium is only granted after the gateway itself confirms success (never trusts a client-supplied status)."
+					}
+				},
+				{
+					"name": "3. Get One Payment Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/payments/{{payment_id}}",
+						"description": "Owner-scoped status of one payment row.\n\nExpected: 200 with `data.status` (PENDING → SUCCESS once verified; FAILED or CANCELLED on a failed/cancelled sandbox payment)."
+					}
+				}
+			],
+			"description": "bKash tokenized SANDBOX (test money). The browser-redirect callback (`GET /payments/callback`) is called by bKash, not you — it redirects to the frontend success/failure page, so it isn't a Postman request."
+		},
+		{
+			"name": "10 - Payment History",
+			"item": [
+				{
+					"name": "1. List My Payments (paginated)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/payments?page=1&limit=10",
+						"description": "Owner-scoped payment history, newest first. Filter with `?status=PENDING|SUCCESS|FAILED|CANCELLED`.\n\nExpected: 200 with `data` array + `meta`."
+					}
+				},
+				{
+					"name": "2. Get Payment By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/payments/{{payment_id}}",
+						"description": "Same as folder 09 req 3 — one payment's status. Expected: 200 (or 404 if the id isn't yours)."
+					}
+				}
+			],
+			"description": "Read-only history for the payments you created in folder 09."
+		},
+		{
+			"name": "11 - Upcoming Features (Admin)",
+			"item": [
+				{
+					"name": "1. Create Upcoming Feature",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{base_url}}/admin/upcoming-features",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"slug\": \"ai-scheduler-{{$timestamp}}\",\n  \"title\": \"AI Scheduler\",\n  \"shortDescription\": \"Auto-pick the best time to post\",\n  \"description\": \"Longer marketing copy for the feature.\",\n  \"status\": \"PLANNED\",\n  \"sortOrder\": 1,\n  \"isPremiumVisible\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"description": "ADMIN only. `slug` must be lowercase letters/numbers/hyphens. `status` is one of the UpcomingFeatureStatus enum: COMING_SOON, IN_DEVELOPMENT, or PLANNED. Captures `feature_id` and `feature_slug`.\n\nExpected: 201."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Feature created (201)', function () { pm.response.to.have.status(201); });",
+									"    if (pm.response.code === 201) {",
+									"        var d = pm.response.json().data;",
+									"        pm.collectionVariables.set('feature_id', d.id);",
+									"        pm.collectionVariables.set('feature_slug', d.slug);",
+									"        console.log('Captured feature_id:', d.id, '| slug:', d.slug);",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2. List All Features (admin view)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/admin/upcoming-features",
+						"description": "ADMIN view — includes non-visible/unpublished rows. Expected: 200."
+					}
+				},
+				{
+					"name": "3. Get Feature By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/admin/upcoming-features/{{feature_id}}",
+						"description": "Expected: 200."
+					}
+				},
+				{
+					"name": "4. Update Feature",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{base_url}}/admin/upcoming-features/{{feature_id}}",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"AI Scheduler (v2)\",\n  \"status\": \"IN_DEVELOPMENT\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"description": "Partial update. Expected: 200."
+					}
+				},
+				{
+					"name": "5. (Optional — attach a file) Set Feature Image",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": "{{base_url}}/admin/upcoming-features/{{feature_id}}/image",
+						"description": "multipart/form-data with a single `image` file field. In Postman: Body → form-data → key `image` (type File) and attach a small PNG/JPG. Real Cloudinary credentials are configured for this project — expected: 200 with `data.imageUrl`/`data.imagePublicId` set."
+					}
+				},
+				{
+					"name": "6. Delete Feature",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{base_url}}/admin/upcoming-features/{{feature_id}}",
+						"description": "Hard delete (admin-managed catalogue, not soft-deleted). Expected: 200. Run this LAST in the folder."
+					}
+				}
+			],
+			"description": "Admin CRUD for the premium 'upcoming features' catalogue. Requires an ADMIN/SUPER_ADMIN session — see the guide's 'Becoming an admin' note."
+		},
+		{
+			"name": "12 - Upcoming Features (Premium user)",
+			"item": [
+				{
+					"name": "1. List Visible Features",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/upcoming-features",
+						"description": "Premium-gated. A non-premium user gets 403. Grant yourself premium first via admin (folder 13 req 5) or a completed payment (folder 09).\n\nExpected: 200 for a premium user, 403 otherwise."
+					}
+				},
+				{
+					"name": "2. Get Feature By Slug",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/upcoming-features/{{feature_slug}}",
+						"description": "Premium-gated detail by slug. Expected: 200 (premium) / 403 (non-premium) / 404 (unknown slug)."
+					}
+				}
+			],
+			"description": "The premium-user-facing side of the same catalogue. Needs isPremium = true on your account."
+		},
+		{
+			"name": "13 - Admin — Users & Audit Log",
+			"item": [
+				{
+					"name": "1. List Users (paginated + search)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/admin/users?page=1&limit=10",
+						"description": "ADMIN/SUPER_ADMIN. Safe projection only (no password hashes/tokens). Filter with `?search=`. The Tests script captures the first user id into `target_user_id` for the mutations below — re-point it at a throwaway user before blocking/role-changing so you don't lock yourself out.\n\nExpected: 200 with `data` + `meta`."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"(function () {",
+									"    pm.test('Users listed (200)', function () { pm.response.to.have.status(200); });",
+									"    if (pm.response.code === 200) {",
+									"        var rows = pm.response.json().data || [];",
+									"        if (rows[0]) { pm.collectionVariables.set('target_user_id', rows[0].id); console.log('Captured target_user_id:', rows[0].id); }",
+									"    }",
+									"})();"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2. Get User By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/admin/users/{{target_user_id}}",
+						"description": "Expected: 200 (safe projection) / 404 if missing."
+					}
+				},
+				{
+					"name": "3. Block / Unblock User",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{base_url}}/admin/users/{{target_user_id}}/status",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"BLOCKED\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"description": "`status` is ACTIVE or BLOCKED. Writes a USER_BLOCKED/USER_UNBLOCKED audit entry. Use a throwaway `target_user_id`, not yourself.\n\nExpected: 200."
+					}
+				},
+				{
+					"name": "4. Change User Role (SUPER_ADMIN only)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{base_url}}/admin/users/{{target_user_id}}/role",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"role\": \"ADMIN\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"description": "SUPER_ADMIN only (an ADMIN gets 403 — they can't escalate roles). `role` is USER/ADMIN/SUPER_ADMIN. Audited as USER_ROLE_CHANGED.\n\nExpected: 200 as SUPER_ADMIN, 403 as ADMIN."
+					}
+				},
+				{
+					"name": "5. Grant / Revoke Premium",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{base_url}}/admin/users/{{target_user_id}}/premium",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"isPremium\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"description": "Directly flips premium (no payment) — handy to unlock folder 12 for a test user. Point `target_user_id` at yourself to test premium features. Audited as USER_PREMIUM_GRANTED/REVOKED.\n\nExpected: 200."
+					}
+				},
+				{
+					"name": "6. List Audit Logs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/admin/audit-logs?page=1&limit=20",
+						"description": "Append-only audit trail of the admin actions above (actor, action, entity, metadata, ip/ua). Expected: 200 with `data` + `meta` — you should see entries from requests 3–5."
+					}
+				}
+			],
+			"description": "Admin user management + the audit log it writes. Requires ADMIN (SUPER_ADMIN for role changes)."
+		},
+		{
+			"name": "14 - Cleanup (optional — run at most ONE, LAST)",
 			"description": "⚠️ These are two ALTERNATIVE endings, not a sequence — run at most one, only once you're completely done testing everything above:\n\n• '1. Delete My Account' — ends the session AND soft-deletes the user (it clears cookies itself as a side effect, so it must come first in this folder's order if you ever run both).\n• '2. Logout' — ends the session only, keeps the user for later. Running this FIRST would make Delete My Account 401 (no session left) — that's why Logout is listed second here, as a fallback if you decide not to delete.\n\nMost of the time you'll run neither and just leave your test data in place for next time.",
 			"item": [
 				{
