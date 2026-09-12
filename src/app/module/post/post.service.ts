@@ -48,7 +48,7 @@ const create = async (userId: string, payload: ICreatePostPayload, file?: Expres
 	} catch (error) {
 		if (image) {
 			await cloudinary.uploader.destroy(image.publicId).catch((cleanupError) => {
-				console.log(`Failed to clean up orphaned post image ${image?.publicId}:`, cleanupError);
+				console.error(`Failed to clean up orphaned post image ${image?.publicId}:`, cleanupError);
 			});
 		}
 		throw error;

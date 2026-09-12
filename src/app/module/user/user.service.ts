@@ -69,7 +69,7 @@ const uploadAvatar = async (userId: string, file: Express.Multer.File) => {
 	// orphans an image but must never fail the upload the user is waiting on).
 	if (user.avatarPublicId) {
 		await cloudinary.uploader.destroy(user.avatarPublicId).catch((error) => {
-			console.log(`Failed to delete previous avatar ${user.avatarPublicId}:`, error);
+			console.error(`Failed to delete previous avatar ${user.avatarPublicId}:`, error);
 		});
 	}
 
@@ -88,7 +88,7 @@ const removeAvatar = async (userId: string) => {
 
 	if (user.avatarPublicId) {
 		await cloudinary.uploader.destroy(user.avatarPublicId).catch((error) => {
-			console.log(`Failed to delete avatar ${user.avatarPublicId}:`, error);
+			console.error(`Failed to delete avatar ${user.avatarPublicId}:`, error);
 		});
 	}
 

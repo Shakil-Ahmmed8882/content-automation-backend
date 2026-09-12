@@ -65,7 +65,7 @@ const setLogo = async (id: string, file: Express.Multer.File) => {
 
 	if (platform.logoPublicId) {
 		await cloudinary.uploader.destroy(platform.logoPublicId).catch((error) => {
-			console.log(`Failed to delete previous platform logo ${platform.logoPublicId}:`, error);
+			console.error(`Failed to delete previous platform logo ${platform.logoPublicId}:`, error);
 		});
 	}
 
