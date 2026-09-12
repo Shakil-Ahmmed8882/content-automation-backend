@@ -20,4 +20,4 @@
 ## 5. Integration & security
 
 - [x] 5.1 Confirm owner-scoping on list/get/delete and that no edit endpoint exists; verify cross-user access is impossible.
-- [x] 5.2 Run `npm run check:fix` + `npx tsc --noEmit`; verify both pass; manual end-to-end (create → list → get → delete).
+- [x] 5.2 Run `npm run check:fix` + `npx tsc --noEmit`; verify both pass. Automated instead of manual: `tests/e2e/content-posts.e2e.test.ts` (17 tests: 16 passed, 1 skipped pending real Cloudinary credentials, same posture as user-profile/platform-catalogue). Run: `npm test` (2026-09-09, re-verified via `/opsx:verify`).

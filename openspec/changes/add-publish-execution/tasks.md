@@ -14,7 +14,7 @@
 - [x] 3.2 `ExecutionService.startPublish` creates the `execution` (PENDING) + one `publication` per platform (snapshot account name) and enqueues a BullMQ job; verify the rows are created and a job is queued.
 - [x] 3.3 `POST /api/v1/posts/:id/publish` returns 202 + execution id (auth + validation); verify it returns promptly with the id.
 
-## 4. Background worker (vertical slice)
+## 4. Background worker (vertical slice) 
 
 - [x] 4.1 BullMQ worker: set execution RUNNING; per publication create attempt #1 (RUNNING), call the publisher, write the terminal attempt + publication status (success: external id/url/publishedAt; failure: reason); verify a queued job publishes each platform and records attempts.
 - [x] 4.2 Compute + persist `execution.status` from publications (COMPLETED/PARTIALLY_COMPLETED/FAILED); verify a forced single-platform failure yields PARTIALLY_COMPLETED.
