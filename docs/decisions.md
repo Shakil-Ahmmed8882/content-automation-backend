@@ -444,3 +444,42 @@ users, so no auth change was needed.
 **Why:** One generic table logs anything without new tables; append-only + best-effort keeps the trail
 trustworthy without adding a failure surface to security-relevant actions; centralizing the wiring in
 the last flow (per the build order) avoided scattering half-built audit code through earlier slices.
+
+## Production runtime: `tsx` instead of compiled `dist/` (2026-09-14)
+
+**Problem:** First real deploy (Render free tier) failed at boot with
+`ERR_UNSUPPORTED_DIR_IMPORT: Directory import '/dist/src/app' is not supported`. Cause: the codebase
+uses extensionless relative imports (`import app from "./app"`) under
+`"moduleResolution": "bundler"`, which `tsx` (used by `npm run dev`) resolves happily but Node's
+strict native ESM loader does not — it resolved `./app` to the `src/app/` **directory** rather than
+the sibling `src/app.ts`. Latent since project start: `npm run build && npm start` had never been
+run, because local dev always goes through `tsx watch`.
+**Decision:** Run the deployed service through `tsx` as well — Render's build command is
+`npm install --include=dev && npx prisma generate`, start command is `npx tsx src/server.ts`.
+`--include=dev` is required because `NODE_ENV=production` makes npm skip devDependencies, and both
+`tsx` and `typescript` live there. The `build`/`start` scripts in package.json are left untouched.
+**Why:** It makes the deployed runtime behave identically to the locally-verified dev runtime, with
+zero code changes, instead of a ~50-file mechanical edit (adding `.js` to every relative import +
+switching to `"nodenext"` resolution) right at deploy time. The per-file transpile overhead is
+negligible for a single long-lived Express process.
+**Alternative weighed:** add explicit `.js` extensions everywhere and switch tsconfig to
+`"nodenext"`, so `tsc` output runs under plain `node`. Correct long-term and worth doing if the
+runtime ever needs the compiled output (faster cold start, no dev-tool in production), but it is a
+large cross-cutting diff that would have blocked the deploy.
+
+## Seeded admin accounts (2026-09-14)
+
+**Problem:** `SUPER_ADMIN_*` / `ADMIN_*` were read in `config/index.ts` and documented in
+`.env.example` as "server refuses to boot if missing", but nothing ever consumed them — `seed.ts`
+only seeded platforms and upcoming features. With no admin-signup endpoint by design, the only way
+to get an admin was the dev-only `npm run admin:promote` CLI against a manually registered user, so
+a freshly deployed environment had **zero** admin accounts (confirmed: 6 users in the database, none
+with an ADMIN/SUPER_ADMIN role) and every `auth("ADMIN","SUPER_ADMIN")` route was unreachable.
+**Decision:** `seedAdminUsers()` in `utils/seed.ts`, called at boot alongside the existing seeds.
+It upserts the SUPER_ADMIN + ADMIN users from env and their CREDENTIALS `account` rows (bcrypt hash
+at `bcrypt_salt_rounds`, matching `auth.service`), re-asserting `role`/`emailVerified` on every boot
+but never overwriting an existing password hash, so a rotated admin password survives a redeploy.
+Silently skips when the env vars are unset.
+**Why:** Makes the already-documented env contract real, and makes an admin exist in any environment
+from first boot instead of depending on a local CLI run against a hand-registered user. Re-asserting
+the role heals a demoted seed account; leaving the hash alone keeps boot from being a password reset.
