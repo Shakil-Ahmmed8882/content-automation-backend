@@ -4,7 +4,7 @@ import { transporter } from "./app/lib/nodemailer";
 import { prisma } from "./app/lib/prisma";
 import { redisClient } from "./app/lib/redis";
 import { startPublishWorker } from "./app/module/execution/execution.worker";
-import { seedPlatforms, seedUpcomingFeatures } from "./app/utils/seed";
+import { seedAdminUsers, seedPlatforms, seedUpcomingFeatures } from "./app/utils/seed";
 
 const PORT = config.port;
 
@@ -25,6 +25,7 @@ const main = async () => {
 
 		await seedPlatforms();
 		await seedUpcomingFeatures();
+		await seedAdminUsers();
 
 		await redisClient.connect();
 		console.log("Connected to redis successfully.");
