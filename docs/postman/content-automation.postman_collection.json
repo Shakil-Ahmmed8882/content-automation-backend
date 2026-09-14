@@ -8,7 +8,7 @@
 	"variable": [
 		{
 			"key": "base_url",
-			"value": "http://localhost:5000/api/v1",
+			"value": "https://content-automation-backend-jwpw.onrender.com/api/v1",
 			"type": "string"
 		},
 		{
