@@ -7,7 +7,7 @@ import { redisClient } from "../../lib/redis";
 import { AppError } from "../../utils/appError";
 import { FB_PAGE_SELECTION_TTL_SECONDS, facebookPageSelectionKey } from "./connection.constant";
 import type { IConnectorConnection, IFacebookPageSelection } from "./connection.interface";
-import { consumeOAuthState, issueOAuthState } from "./connection.utils";
+import { consumeOAuthState, issueOAuthState, OAuthCallbackError } from "./connection.utils";
 import { getConnector } from "./connectors";
 
 const FACEBOOK_KEY = "facebook";
@@ -95,10 +95,18 @@ const handleCallback = async (
 ) => {
 	const statePayload = await consumeOAuthState(state);
 	if (!statePayload || statePayload.platformKey !== platformKey) {
-		throw new AppError(httpStatus.BAD_REQUEST, "Invalid or expired OAuth state");
+		throw new OAuthCallbackError(
+			httpStatus.BAD_REQUEST,
+			"Invalid or expired OAuth state",
+			"invalid-state",
+		);
 	}
 	if (!code) {
-		throw new AppError(httpStatus.BAD_REQUEST, "Missing authorization code");
+		throw new OAuthCallbackError(
+			httpStatus.BAD_REQUEST,
+			"Missing authorization code",
+			"missing-code",
+		);
 	}
 
 	const { userId } = statePayload;

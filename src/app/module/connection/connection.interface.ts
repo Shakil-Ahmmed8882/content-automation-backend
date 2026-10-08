@@ -40,6 +40,21 @@ export interface ISocialConnector {
 	handleCallback(code: string): Promise<ICallbackResult>;
 }
 
+/** The only failure codes the frontend `/connections` page understands in `?error=`.
+ * Fixed vocabulary on purpose: provider messages/ids never reach a URL. */
+export type OAuthRedirectErrorCode = "cancelled" | "invalid-state" | "failed";
+
+/** Why the service rejected a callback in a way the redirect branch must tell
+ * apart from a generic failure (see `OAuthCallbackError`). */
+export type OAuthCallbackFailureReason = "invalid-state" | "missing-code";
+
+/** The result of a callback that arrived as a browser navigation, before it is
+ * turned into a redirect to the frontend `/connections` page. */
+export type OAuthRedirectOutcome =
+	| { kind: "connected"; platformKey: string }
+	| { kind: "select-page" }
+	| { kind: "error"; code: OAuthRedirectErrorCode };
+
 /** What we stash in Redis (JSON) tying an OAuth `state` to the initiating user. */
 export interface IOAuthStatePayload {
 	userId: string;
