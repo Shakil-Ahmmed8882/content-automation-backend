@@ -594,7 +594,7 @@
 						"method": "GET",
 						"header": [],
 						"url": "{{base_url}}/connections/linkedin/callback?code=fake-code&state=bogus-state",
-						"description": "Expected: 400 — the OAuth callback validates the single-use `state` against Redis and refuses a value it never issued, storing nothing. This is the CSRF defense; a real provider redirect carries a state this server minted in step 2."
+						"description": "Expected: 400 — the OAuth callback validates the single-use `state` against Redis and refuses a value it never issued, storing nothing. This is the CSRF defense; a real provider redirect carries a state this server minted in step 2. Postman sends no `Sec-Fetch-Mode: navigate`, so you always see this JSON; when the PROVIDER redirects a real browser to the callback, the backend answers with a 302 to `${FRONTEND_URL}/connections?error=invalid-state` (or `?connected=<key>` / `?select=facebook` / `?error=cancelled|failed`) instead - see docs/decisions.md, \"OAuth callback redirects browsers to the frontend\"."
 					}
 				},
 				{
