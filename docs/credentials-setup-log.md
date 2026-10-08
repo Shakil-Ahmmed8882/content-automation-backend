@@ -268,6 +268,12 @@ React/Vue can render a proper "select your Page" UI instead of raw JSON. That re
 implemented yet; it's a frontend-integration detail, not a backend bug — Postman testing doesn't
 need it since we read the raw JSON directly.
 
+**Update (OAuth callback redirects browsers to the frontend):** that redirect is now implemented. When the
+callback request is a browser navigation (`Sec-Fetch-Mode: navigate`), the backend still handles the callback at
+the registered redirect URI and then `302`s the browser to `${FRONTEND_URL}/connections?connected=<key>`,
+`?select=facebook`, or `?error=cancelled|invalid-state|failed`. Programmatic callers (Postman, XHR) still get the
+JSON described above. No env var or provider-console change is needed.
+
 **Status:** ✅ Done — real, live, end-to-end verified (not just config-checked).
 
 ====================================================================================================

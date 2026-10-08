@@ -483,3 +483,32 @@ Silently skips when the env vars are unset.
 **Why:** Makes the already-documented env contract real, and makes an admin exist in any environment
 from first boot instead of depending on a local CLI run against a hand-registered user. Re-asserting
 the role heals a demoted seed account; leaving the hash alone keeps boot from being a password reset.
+
+## OAuth callback redirects browsers to the frontend (2026-10-08)
+
+**Problem:** The provider redirect URIs (`LINKEDIN_REDIRECT_URI` / `FACEBOOK_REDIRECT_URI`) point at this backend
+(`/api/v1/connections/<key>/callback`) and are registered in the provider consoles. After consent the user's
+browser landed on that URL and showed raw JSON; the user had to press Back to return to the frontend `/connections`
+page they started from.
+**Decision:** `ConnectionController.callback` now tells a browser **navigation** from a **programmatic** call. A
+navigation (`Sec-Fetch-Mode: navigate`; only when that header is absent, `Accept` has `text/html` and not
+`application/json`) gets a `302` to `${FRONTEND_URL}/connections?...` with one fixed param; everything else gets the
+exact JSON and status codes as before (`isBrowserNavigation` in `connection.utils.ts`). Outcomes: connected (also
+Facebook with exactly one Page) -> `?connected=<platformKey>`; Facebook Page choice needed -> `?select=facebook`;
+provider `error` of `access_denied` / `user_cancelled_login` / `user_cancelled_authorize` with no code ->
+`?error=cancelled`; missing/unknown/expired/replayed/other-platform `state` -> `?error=invalid-state`; anything else
+(other provider error, missing code, 502 token exchange, platform not live/wired, unexpected exception) ->
+`?error=failed`. The service tags its two rejections with `OAuthCallbackError` (an `AppError` subclass, reason kept
+in a private field so the JSON body is byte-identical) so the controller can classify without parsing messages.
+**Why:** It fixes the stranded user without touching `.env` or provider-console registrations and keeps the JSON
+contract the frontend callback page and the E2E suite rely on. The redirect target is built only from
+`config.frontend_url` (trailing slash tolerated, must be http(s), else the JSON response is used), a fixed path and
+fixed codes (plus the platform key of the row just stored), so request input is never reflected (no open redirect)
+and no code, token, provider message or id reaches a URL. The `state` is still consumed on a provider error, the
+redirect carries `Cache-Control: no-store`, and both answers carry `Vary: Sec-Fetch-Mode, Accept`. A failure in the
+navigation branch is caught inline and redirected (same reasoning as `PaymentController.callback`: never a JSON
+error page for a user mid-redirect); only the error name/static message is logged.
+**Alternative weighed:** moving the redirect URIs to a frontend route that calls this endpoint with `fetch`. It works
+with the unchanged JSON endpoint but needs an env change plus re-registration in both provider consoles, and the
+single-use `code` would travel through frontend history/analytics; the server-side 302 needs neither.
+**Tests:** `tests/e2e/connection-callback-redirect.e2e.test.ts` (provider connectors mocked, everything else real).

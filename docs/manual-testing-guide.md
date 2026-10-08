@@ -311,6 +311,14 @@ platforms are connectable.
 callback validates the single-use `state` against Redis and refuses one it never issued, storing
 nothing. A real provider redirect carries the state minted in step 2.
 
+> **Browser vs Postman.** The callback answers two kinds of caller. Postman/curl/XHR (no
+> `Sec-Fetch-Mode: navigate`) get the JSON above. When the provider redirects a real **browser** to this
+> URL, the backend finishes the handshake and replies `302` to `${FRONTEND_URL}/connections?...`:
+> `?connected=<platformKey>`, `?select=facebook` (pick a Page), `?error=cancelled` (consent denied),
+> `?error=invalid-state` (missing/expired/replayed state) or `?error=failed` (anything else). To see the
+> redirect with curl: `curl -i -H "Sec-Fetch-Mode: navigate" "<base>/connections/linkedin/callback?code=x&state=bogus"`
+> gives `302` with `Location: <FRONTEND_URL>/connections?error=invalid-state`.
+
 ### 5. Disconnect (not connected → 404)
 `DELETE /connections/linkedin`. **Expected:** `404` — you have no LinkedIn connection to remove.
 Once a real connection exists, this hard-deletes it (physically removing the encrypted tokens) and
