@@ -512,3 +512,16 @@ error page for a user mid-redirect); only the error name/static message is logge
 with the unchanged JSON endpoint but needs an env change plus re-registration in both provider consoles, and the
 single-use `code` would travel through frontend history/analytics; the server-side 302 needs neither.
 **Tests:** `tests/e2e/connection-callback-redirect.e2e.test.ts` (provider connectors mocked, everything else real).
+
+## SMTP verification no longer blocks boot (2026-10-10)
+
+**Problem:** `server.ts` awaited `transporter.verify()` before `app.listen()`. Render's free tier blocks outbound
+SMTP ports (25/465/587) since Sept 2025, so on a cold start the verify call can only hang until nodemailer's
+connection timeout (2 min by default) before failing — and every request that woke the service waited that long,
+long enough for the frontend's session check to time out.
+**Decision:** call `app.listen()` first and run `transporter.verify()` in the background, logging success/failure as
+before. Database, seeding, Redis and the BullMQ publish worker still start (and are awaited) before `listen()`,
+unchanged.
+**Why:** the comment above it already said email must never be boot-blocking; this makes that true. The existing
+root-level `GET /health` was left as is — the frontend's session request is what wakes the service, so no new
+health endpoint was needed.
