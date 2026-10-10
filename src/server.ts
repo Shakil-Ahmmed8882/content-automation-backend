@@ -35,20 +35,21 @@ const main = async () => {
 		startPublishWorker();
 		console.log("Publish worker started.");
 
-		// Best-effort, never boot-blocking: this repo's .env SMTP creds are a
-		// placeholder (no real account configured yet), so verify() always fails
-		// here. Same principle as runtime sends (lib/nodemailer.ts) — an email
-		// problem must never stop the app from serving requests.
-		try {
-			await transporter.verify();
-			console.log("Nodemailer connected successfully.");
-		} catch (error) {
-			console.warn("Nodemailer verification failed (emails will silently no-op):", error);
-		}
-
 		app.listen(PORT, () => {
 			console.log(`Server is running on port ${PORT}`);
 		});
+
+		// Best-effort and in the background, after listen(): an email problem must
+		// never stop the app from serving requests (same principle as runtime sends
+		// in lib/nodemailer.ts). Awaiting it before listen() delayed every cold
+		// start until the SMTP connection timed out — Render's free tier blocks
+		// outbound SMTP ports, so verify() can only hang there.
+		transporter
+			.verify()
+			.then(() => console.log("Nodemailer connected successfully."))
+			.catch((error) =>
+				console.warn("Nodemailer verification failed (emails will silently no-op):", error),
+			);
 	} catch (error) {
 		console.error("Error starting the server:", error);
 		await prisma.$disconnect();
